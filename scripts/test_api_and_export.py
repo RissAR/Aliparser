@@ -158,21 +158,21 @@ def run_tests() -> None:
 
     headers = [ws.cell(row=1, column=col).value for col in range(1, 13)]
     expected_headers = [
-        "ID товару",
-        "Назва товару",
-        "Ціна",
-        "Стара ціна",
-        "Валюта",
-        "Рейтинг",
-        "Замовлення",
-        "Магазин",
-        "Категорія / Запит",
-        "Посилання на товар",
-        "Посилання на фото",
-        "Дата збору (UTC)",
+        "Item ID",
+        "Product Title",
+        "Price",
+        "Original Price",
+        "Currency",
+        "Rating",
+        "Orders",
+        "Store",
+        "Category / Query",
+        "Product URL",
+        "Image URL",
+        "Scraped At (UTC)",
     ]
     assert headers == expected_headers, f"Excel headers mismatch: {headers} != {expected_headers}"
-    logger.info("  [OK] Excel sheet 'AliExpress Products' headers verified (12 columns)")
+    logger.info("  [OK] Excel sheet 'AliExpress Products' headers verified (12 English columns)")
 
     row2_id = ws.cell(row=2, column=1).value
     row2_title = ws.cell(row=2, column=2).value

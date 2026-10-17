@@ -1,7 +1,9 @@
 """Excel (.xlsx) export service for scraped AliExpress products."""
 
 import io
-from typing import List
+import re
+import zipfile
+from typing import List, Optional
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -10,19 +12,43 @@ from openpyxl.utils import get_column_letter
 from src.db.models import Product
 
 EXCEL_HEADERS = [
-    "ID товару",
-    "Назва товару",
-    "Ціна",
-    "Стара ціна",
-    "Валюта",
-    "Рейтинг",
-    "Замовлення",
-    "Магазин",
-    "Категорія / Запит",
-    "Посилання на товар",
-    "Посилання на фото",
-    "Дата збору (UTC)",
+    "Item ID",
+    "Product Title",
+    "Price",
+    "Original Price",
+    "Currency",
+    "Rating",
+    "Orders",
+    "Store",
+    "Category / Query",
+    "Product URL",
+    "Image URL",
+    "Scraped At (UTC)",
 ]
+
+_XML_ILLEGAL_CHARS_RE = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]")
+
+
+def _clean_xml_string(value: Optional[str]) -> str:
+    """Remove illegal XML control characters from a string."""
+    if not value:
+        return ""
+    return _XML_ILLEGAL_CHARS_RE.sub("", str(value)).strip()
+
+
+def _normalize_xlsx_zip(raw_bytes: bytes) -> bytes:
+    """Normalize OOXML relationship paths in xl/_rels/workbook.xml.rels for strict compatibility."""
+    in_buf = io.BytesIO(raw_bytes)
+    out_buf = io.BytesIO()
+    with zipfile.ZipFile(in_buf, "r") as zin, zipfile.ZipFile(out_buf, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == "xl/_rels/workbook.xml.rels":
+                text = data.decode("utf-8")
+                text = text.replace('Target="/xl/', 'Target="')
+                data = text.encode("utf-8")
+            zout.writestr(item, data)
+    return out_buf.getvalue()
 
 
 def generate_products_excel(products: List[Product]) -> bytes:
@@ -41,9 +67,9 @@ def generate_products_excel(products: List[Product]) -> bytes:
     # Freeze header row
     ws.freeze_panes = "A2"
 
-    # Header styling
-    header_font = Font(bold=True, color="FFFFFF")
-    header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+    # Header styling (8-digit ARGB colors)
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFFFF")
+    header_fill = PatternFill(start_color="FF1E293B", end_color="FF1E293B", fill_type="solid")
     header_alignment = Alignment(horizontal="center", vertical="center")
 
     ws.append(EXCEL_HEADERS)
@@ -53,7 +79,8 @@ def generate_products_excel(products: List[Product]) -> bytes:
         cell.fill = header_fill
         cell.alignment = header_alignment
 
-    link_font = Font(color="2563EB", underline="single")
+    data_font = Font(name="Calibri", size=10, color="FF0F172A")
+    link_font = Font(name="Calibri", size=10, color="FF2563EB", underline="single")
 
     for row_idx, product in enumerate(products, start=2):
         scraped_str = (
@@ -62,26 +89,30 @@ def generate_products_excel(products: List[Product]) -> bytes:
             else ""
         )
 
+        clean_url = _clean_xml_string(product.product_url)
         row_values = [
-            product.item_id,
-            product.title,
+            _clean_xml_string(product.item_id),
+            _clean_xml_string(product.title),
             float(product.price) if product.price is not None else None,
             float(product.original_price) if product.original_price is not None else None,
-            product.currency or "USD",
+            _clean_xml_string(product.currency or "USD"),
             float(product.rating) if product.rating is not None else None,
-            product.orders_count or "",
-            product.store_name or "",
-            product.category_or_query or "",
-            product.product_url or "",
-            product.image_url or "",
+            _clean_xml_string(product.orders_count),
+            _clean_xml_string(product.store_name),
+            _clean_xml_string(product.category_or_query),
+            clean_url,
+            _clean_xml_string(product.image_url),
             scraped_str,
         ]
         ws.append(row_values)
 
+        for col_idx in range(1, len(EXCEL_HEADERS) + 1):
+            ws.cell(row=row_idx, column=col_idx).font = data_font
+
         # Make product URL column (column 10) a clickable hyperlink
-        if product.product_url:
+        if clean_url:
             url_cell = ws.cell(row=row_idx, column=10)
-            url_cell.hyperlink = product.product_url
+            url_cell.hyperlink = clean_url
             url_cell.font = link_font
 
     # Auto-adjust column widths within [12, 50]
@@ -100,4 +131,4 @@ def generate_products_excel(products: List[Product]) -> bytes:
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
-    return buffer.getvalue()
+    return _normalize_xlsx_zip(buffer.getvalue())

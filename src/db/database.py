@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timezone
 from typing import Generator, List, Optional
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.db.models import Base, Product
@@ -22,11 +22,28 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+BADGE_IMAGE_SUBSTRINGS = (
+    "154x64.png",
+    "Sb008eb53e92f463eb0a2c17c539df530h.png",
+    "S1887a285b60743859ac7bdbfca5e0896Z",
+    "S5efe9a37755e44cfa878e2e714900709h",
+    "110x42.png",
+    "48x48.png",
+    "60x60.png",
+    "702x72.png",
+    "116x64.png",
+)
+
 
 def init_db() -> None:
-    """Create database directory and initialize all SQLAlchemy tables."""
+    """Create database directory, initialize all SQLAlchemy tables, and clean legacy badge image URLs."""
     os.makedirs("data", exist_ok=True)
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        conditions = [Product.image_url.like(f"%{pat}%") for pat in BADGE_IMAGE_SUBSTRINGS]
+        stmt = update(Product).where(or_(*conditions)).values(image_url="")
+        db.execute(stmt)
+        db.commit()
 
 
 def get_db() -> Generator[Session, None, None]:

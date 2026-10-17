@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,41 +23,50 @@
     .progress-striped {
       background-image: linear-gradient(
         45deg,
-        rgba(255, 255, 255, 0.15) 25%,
+        rgba(255, 255, 255, 0.25) 25%,
         transparent 25%,
         transparent 50%,
-        rgba(255, 255, 255, 0.15) 50%,
-        rgba(255, 255, 255, 0.15) 75%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0.25) 75%,
         transparent 75%,
         transparent
       );
       background-size: 1rem 1rem;
       animation: progress-stripes 0.8s linear infinite;
     }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
     dialog::backdrop {
-      background-color: rgba(2, 6, 23, 0.75);
+      background-color: rgba(15, 23, 42, 0.45);
       backdrop-filter: blur(4px);
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased selection:bg-indigo-600 selection:text-white">
 
   <!-- Top Header -->
-  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
       <!-- Brand -->
       <div class="flex items-center gap-3">
-        <img src="/icon.svg" alt="AliParser Logo" class="w-10 h-10 rounded-xl shadow-lg shadow-indigo-500/20" />
+        <img src="/icon.svg" alt="AliParser Logo" class="w-10 h-10 rounded-xl shadow-sm" />
         <div>
           <div class="flex items-center gap-2.5">
-            <h1 class="text-lg font-bold tracking-tight text-white">AliParser</h1>
+            <h1 class="text-lg font-bold tracking-tight text-slate-900">AliParser</h1>
             <!-- Live Status Pill -->
-            <span id="headerStatusPill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+            <span id="headerStatusPill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-slate-100 text-slate-700 border border-slate-200">
               <span id="headerStatusDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
               <span id="headerStatusText">IDLE</span>
             </span>
           </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Universal AliExpress Catalog &amp; Search Scraper</p>
+          <p class="text-xs text-slate-500 hidden sm:block">Universal AliExpress Catalog &amp; Search Scraper</p>
         </div>
       </div>
 
@@ -67,9 +76,9 @@
           id="openProxyModalBtn"
           type="button"
           onclick="openProxyModal()"
-          class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+          class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 shadow-2xs transition-colors cursor-pointer"
         >
-          <i data-lucide="shield-check" class="w-4 h-4 text-indigo-400"></i>
+          <i data-lucide="shield-check" class="w-4 h-4 text-indigo-600"></i>
           <span id="proxiesCountBtnText">Proxies (0)</span>
         </button>
 
@@ -77,10 +86,10 @@
           id="exportExcelBtn"
           type="button"
           onclick="exportExcel()"
-          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-900/40 transition-colors"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-colors cursor-pointer"
         >
           <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-          <span>Export Excel (.xlsx)</span>
+          <span id="exportExcelBtnText">Export Excel (.xlsx)</span>
         </button>
       </div>
     </div>
@@ -90,19 +99,19 @@
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
     <!-- Error Banner -->
-    <div id="errorBanner" class="hidden rounded-xl bg-rose-950/80 border border-rose-700/80 p-4 text-rose-200 shadow-lg">
+    <div id="errorBanner" class="hidden rounded-xl bg-rose-50 border border-rose-200 p-4 text-rose-800 shadow-xs">
       <div class="flex items-start justify-between gap-3">
         <div class="flex items-center gap-2.5">
-          <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400 shrink-0"></i>
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600 shrink-0"></i>
           <div>
-            <p class="text-sm font-semibold text-rose-100">Scraper Alert / Error</p>
-            <p id="errorBannerMessage" class="text-xs text-rose-200 mt-0.5"></p>
+            <p class="text-sm font-semibold text-rose-900">Scraper Alert / Error</p>
+            <p id="errorBannerMessage" class="text-xs text-rose-700 mt-0.5"></p>
           </div>
         </div>
         <button
           type="button"
           onclick="dismissErrorBanner()"
-          class="px-2.5 py-1 rounded-md text-xs font-medium bg-rose-900/70 hover:bg-rose-800 text-rose-100 border border-rose-700/60 transition-colors"
+          class="px-2.5 py-1 rounded-md text-xs font-medium bg-white hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors cursor-pointer"
         >
           Dismiss
         </button>
@@ -113,19 +122,19 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
       <!-- B. Scraper Control Card -->
-      <section class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      <section class="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-base font-semibold text-white flex items-center gap-2">
-            <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+          <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <i data-lucide="sliders" class="w-4 h-4 text-indigo-600"></i>
             <span>Scraper Control Center</span>
           </h2>
-          <span class="text-xs text-slate-400">Playwright Stealth Engine</span>
+          <span class="text-xs font-medium text-slate-500">Playwright Stealth Engine</span>
         </div>
 
         <form id="scraperForm" onsubmit="handleStartScraping(event)" class="space-y-4">
           <!-- Target Input -->
           <div>
-            <label for="targetInput" class="block text-xs font-medium text-slate-300 mb-1.5">
+            <label for="targetInput" class="block text-xs font-semibold text-slate-700 mb-1.5">
               Search Query or Category URL
             </label>
             <div class="relative">
@@ -135,59 +144,99 @@
                 required
                 value="wireless mouse"
                 placeholder="e.g. wireless mechanical keyboard or https://www.aliexpress.com/category/..."
-                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition"
+                class="w-full rounded-xl bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none transition"
               />
             </div>
             <!-- Quick Presets -->
             <div class="flex flex-wrap items-center gap-1.5 mt-2">
-              <span class="text-[11px] text-slate-400 mr-1">Quick Presets:</span>
-              <button type="button" onclick="setPreset('wireless mouse')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">wireless mouse</button>
-              <button type="button" onclick="setPreset('mechanical keyboard')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">mechanical keyboard</button>
-              <button type="button" onclick="setPreset('usb c hub')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">usb c hub</button>
-              <button type="button" onclick="setPreset('smart watch')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">smart watch</button>
+              <span class="text-[11px] font-medium text-slate-500 mr-1">Quick Presets:</span>
+              <button type="button" onclick="setPreset('wireless mouse')" class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 transition cursor-pointer">wireless mouse</button>
+              <button type="button" onclick="setPreset('mechanical keyboard')" class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 transition cursor-pointer">mechanical keyboard</button>
+              <button type="button" onclick="setPreset('usb c hub')" class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 transition cursor-pointer">usb c hub</button>
+              <button type="button" onclick="setPreset('smart watch')" class="px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 transition cursor-pointer">smart watch</button>
             </div>
           </div>
 
           <!-- Numeric & Proxy Parameters -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <!-- Max Pages with custom -/+ buttons -->
             <div>
-              <label for="maxPagesInput" class="block text-xs font-medium text-slate-300 mb-1">
+              <label for="maxPagesInput" class="block text-xs font-semibold text-slate-700 mb-1">
                 Max Pages (1–50)
               </label>
-              <input
-                id="maxPagesInput"
-                type="number"
-                min="1"
-                max="50"
-                value="1"
-                required
-                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-2 text-sm text-white outline-none"
-              />
+              <div class="flex items-center rounded-xl bg-slate-50 border border-slate-300 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/15 overflow-hidden transition">
+                <button
+                  type="button"
+                  onclick="stepInput('maxPagesInput', -1)"
+                  aria-label="Decrease Max Pages"
+                  class="px-3 py-2 text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 active:bg-slate-200 border-r border-slate-200 transition select-none cursor-pointer"
+                >
+                  &minus;
+                </button>
+                <input
+                  id="maxPagesInput"
+                  type="number"
+                  min="1"
+                  max="50"
+                  step="1"
+                  value="1"
+                  required
+                  class="w-full text-center bg-transparent border-0 focus:ring-0 py-2 text-sm font-semibold text-slate-900 outline-none"
+                />
+                <button
+                  type="button"
+                  onclick="stepInput('maxPagesInput', 1)"
+                  aria-label="Increase Max Pages"
+                  class="px-3 py-2 text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 active:bg-slate-200 border-l border-slate-200 transition select-none cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
             </div>
 
+            <!-- Page Delay with custom -/+ buttons -->
             <div>
-              <label for="delayInput" class="block text-xs font-medium text-slate-300 mb-1">
+              <label for="delayInput" class="block text-xs font-semibold text-slate-700 mb-1">
                 Page Delay (sec)
               </label>
-              <input
-                id="delayInput"
-                type="number"
-                min="0"
-                max="30"
-                step="0.5"
-                value="1.5"
-                required
-                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-2 text-sm text-white outline-none"
-              />
+              <div class="flex items-center rounded-xl bg-slate-50 border border-slate-300 focus-within:border-indigo-600 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-500/15 overflow-hidden transition">
+                <button
+                  type="button"
+                  onclick="stepInput('delayInput', -0.5)"
+                  aria-label="Decrease Page Delay"
+                  class="px-3 py-2 text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 active:bg-slate-200 border-r border-slate-200 transition select-none cursor-pointer"
+                >
+                  &minus;
+                </button>
+                <input
+                  id="delayInput"
+                  type="number"
+                  min="0"
+                  max="30"
+                  step="0.5"
+                  value="1.5"
+                  required
+                  class="w-full text-center bg-transparent border-0 focus:ring-0 py-2 text-sm font-semibold text-slate-900 outline-none"
+                />
+                <button
+                  type="button"
+                  onclick="stepInput('delayInput', 0.5)"
+                  aria-label="Increase Page Delay"
+                  class="px-3 py-2 text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 active:bg-slate-200 border-l border-slate-200 transition select-none cursor-pointer"
+                >
+                  +
+                </button>
+              </div>
             </div>
 
+            <!-- Connection Proxy -->
             <div>
-              <label for="proxySelect" class="block text-xs font-medium text-slate-300 mb-1">
+              <label for="proxySelect" class="block text-xs font-semibold text-slate-700 mb-1">
                 Connection Proxy
               </label>
               <select
                 id="proxySelect"
-                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-2 text-sm text-white outline-none"
+                class="w-full rounded-xl bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 px-3 py-2 text-sm text-slate-900 outline-none transition"
               >
                 <option value="">Direct Connection (No Proxy)</option>
               </select>
@@ -199,9 +248,9 @@
             <button
               id="startScrapingBtn"
               type="submit"
-              class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 disabled:text-slate-400 disabled:cursor-not-allowed text-white shadow-md shadow-indigo-950/60 transition-colors"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed text-white shadow-sm transition-colors cursor-pointer"
             >
-              <span id="startBtnSpinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <span id="startBtnSpinner" class="hidden w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></span>
               <i id="startBtnIcon" data-lucide="play" class="w-4 h-4"></i>
               <span id="startBtnText">Start Scraping</span>
             </button>
@@ -211,7 +260,7 @@
               type="button"
               disabled
               onclick="handleStopScraping()"
-              class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:border-slate-700 disabled:cursor-not-allowed text-white border border-rose-500/40 transition-colors"
+              class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed text-white border border-rose-600 transition-colors cursor-pointer"
             >
               <i data-lucide="square" class="w-4 h-4"></i>
               <span>Stop Parser</span>
@@ -221,23 +270,23 @@
       </section>
 
       <!-- C. Live Telemetry & Progress Panel -->
-      <section class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+      <section class="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
         <div>
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-base font-semibold text-white flex items-center gap-2">
-              <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+            <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
               <span>Live Telemetry &amp; Progress</span>
             </h2>
-            <span id="telemetryTaskBadge" class="text-xs font-mono text-slate-400">No active run</span>
+            <span id="telemetryTaskBadge" class="text-xs font-mono font-medium text-slate-500">No active run</span>
           </div>
 
           <!-- Progress Bar -->
           <div class="mb-5">
             <div class="flex items-center justify-between text-xs mb-1.5">
-              <span id="progressPageLabel" class="font-medium text-slate-300">Page 0 of 0 (0%)</span>
-              <span id="progressTargetLabel" class="text-slate-400 truncate max-w-[200px]">Ready</span>
+              <span id="progressPageLabel" class="font-semibold text-slate-700">Page 0 of 0 (0%)</span>
+              <span id="progressTargetLabel" class="text-slate-500 truncate max-w-[200px]">Ready</span>
             </div>
-            <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+            <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200 p-0.5">
               <div
                 id="progressBarFill"
                 class="h-full rounded-full bg-gradient-to-r from-indigo-600 to-emerald-500 transition-all duration-300"
@@ -249,44 +298,44 @@
           <!-- Telemetry Metrics Cards -->
           <div class="grid grid-cols-2 gap-3">
             <!-- Elapsed Time -->
-            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
-              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-3">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-600"></i>
                 <span>Elapsed Time</span>
               </div>
-              <p id="metricElapsed" class="text-xl font-bold font-mono text-white mt-1">00:00</p>
+              <p id="metricElapsed" class="text-xl font-bold font-mono text-slate-900 mt-1">00:00</p>
             </div>
 
             <!-- Estimated Remaining (ETA) -->
-            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
-              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <i data-lucide="hourglass" class="w-3.5 h-3.5 text-amber-400"></i>
+            <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-3">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i data-lucide="hourglass" class="w-3.5 h-3.5 text-amber-600"></i>
                 <span>Estimated Remaining</span>
               </div>
-              <p id="metricEta" class="text-xl font-bold font-mono text-amber-300 mt-1">—</p>
+              <p id="metricEta" class="text-xl font-bold font-mono text-amber-600 mt-1">—</p>
             </div>
 
             <!-- Items Collected -->
-            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
-              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <i data-lucide="package-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-3">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i data-lucide="package-check" class="w-3.5 h-3.5 text-emerald-600"></i>
                 <span>Items Collected</span>
               </div>
-              <p id="metricItemsCount" class="text-xl font-bold font-mono text-emerald-400 mt-1">0</p>
+              <p id="metricItemsCount" class="text-xl font-bold font-mono text-emerald-600 mt-1">0</p>
             </div>
 
             <!-- Scraping Speed -->
-            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
-              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <i data-lucide="zap" class="w-3.5 h-3.5 text-sky-400"></i>
+            <div class="bg-slate-50 border border-slate-200/90 rounded-xl p-3">
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-indigo-600"></i>
                 <span>Collection Speed</span>
               </div>
-              <p id="metricSpeed" class="text-xl font-bold font-mono text-sky-300 mt-1">0.00 <span class="text-xs font-normal text-slate-400">items/sec</span></p>
+              <p id="metricSpeed" class="text-xl font-bold font-mono text-indigo-600 mt-1">0.00 <span class="text-xs font-normal text-slate-500">items/sec</span></p>
             </div>
           </div>
         </div>
 
-        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+        <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
           <span>Auto-saves products per page</span>
           <span id="lastUpdatedTime">Synced: Just now</span>
         </div>
@@ -294,15 +343,15 @@
     </div>
 
     <!-- D. Scraped Products Catalog Table -->
-    <section class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+    <section class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
       <!-- Table Toolbar -->
-      <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5">
+      <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5">
         <div class="flex flex-wrap items-center gap-3">
-          <h2 class="text-base font-semibold text-white flex items-center gap-2">
-            <i data-lucide="shopping-bag" class="w-4 h-4 text-indigo-400"></i>
+          <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <i data-lucide="shopping-bag" class="w-4 h-4 text-indigo-600"></i>
             <span>Scraped Products Catalog</span>
           </h2>
-          <span id="totalProductsBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-300 border border-indigo-800/70">
+          <span id="totalProductsBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
             Total Products: 0
           </span>
         </div>
@@ -316,7 +365,7 @@
               type="text"
               oninput="handleSearchDebounce()"
               placeholder="Search products by title, store, or category..."
-              class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 pl-3.5 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none"
+              class="w-full rounded-xl bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 pl-3.5 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 outline-none transition"
             />
           </div>
 
@@ -325,7 +374,7 @@
             id="taskFilterSelect"
             onchange="loadProducts()"
             aria-label="Filter by Scraping Run"
-            class="rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-1.5 text-xs text-slate-200 outline-none"
+            class="rounded-xl bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-indigo-600 px-3 py-1.5 text-xs text-slate-700 outline-none transition"
           >
             <option value="">All Scraping Runs</option>
           </select>
@@ -333,7 +382,7 @@
           <button
             type="button"
             onclick="refreshAllData()"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition cursor-pointer"
           >
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span>Refresh</span>
@@ -342,7 +391,7 @@
           <button
             type="button"
             onclick="handleClearProducts()"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border border-rose-800/60 transition"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer"
           >
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
             <span>Clear All</span>
@@ -354,7 +403,7 @@
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
           <thead>
-            <tr class="border-b border-slate-800 bg-slate-950/60 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <th class="py-3 px-4">Product</th>
               <th class="py-3 px-4">Price</th>
               <th class="py-3 px-4">Rating &amp; Orders</th>
@@ -363,7 +412,7 @@
               <th class="py-3 px-4 text-right">Action</th>
             </tr>
           </thead>
-          <tbody id="productsTableBody" class="divide-y divide-slate-800/70 text-sm">
+          <tbody id="productsTableBody" class="divide-y divide-slate-200/70 text-sm">
             <tr>
               <td colspan="6" class="py-12 text-center text-slate-500 text-sm">
                 No products in catalog yet. Start a scraping run above to populate items.
@@ -380,17 +429,17 @@
     id="proxyModal"
     closedby="any"
     aria-labelledby="proxyModalTitle"
-    class="w-full max-w-2xl rounded-2xl bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl p-0 overflow-hidden"
+    class="w-full max-w-2xl rounded-2xl bg-white text-slate-900 border border-slate-200 shadow-2xl p-0 overflow-hidden"
   >
-    <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+    <div class="p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
       <div class="flex items-center gap-2.5">
-        <i data-lucide="shield" class="w-5 h-5 text-indigo-400"></i>
-        <h3 id="proxyModalTitle" class="text-base font-semibold text-white">Proxy Manager</h3>
+        <i data-lucide="shield" class="w-5 h-5 text-indigo-600"></i>
+        <h3 id="proxyModalTitle" class="text-base font-semibold text-slate-900">Proxy Manager</h3>
       </div>
       <button
         type="button"
         onclick="closeProxyModal()"
-        class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+        class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 transition cursor-pointer"
         aria-label="Close Proxy Manager"
       >
         <i data-lucide="x" class="w-4 h-4"></i>
@@ -399,9 +448,9 @@
 
     <div class="p-5 space-y-5">
       <!-- Add Proxy Form -->
-      <form id="addProxyForm" onsubmit="handleAddProxy(event)" class="space-y-3 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
-        <label for="newProxyInput" class="block text-xs font-medium text-slate-300">
-          Add Proxy Server (<code class="text-indigo-300">host:port</code>, <code class="text-indigo-300">host:port:user:pass</code>, <code class="text-indigo-300">http://...</code>, <code class="text-indigo-300">socks5://...</code>)
+      <form id="addProxyForm" onsubmit="handleAddProxy(event)" class="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <label for="newProxyInput" class="block text-xs font-semibold text-slate-700">
+          Add Proxy Server (<code class="text-indigo-600">host:port</code>, <code class="text-indigo-600">host:port:user:pass</code>, <code class="text-indigo-600">http://...</code>, <code class="text-indigo-600">socks5://...</code>)
         </label>
         <div class="flex flex-col sm:flex-row gap-2.5">
           <input
@@ -409,29 +458,29 @@
             type="text"
             required
             placeholder="e.g. 192.168.1.10:8080:myuser:mypass or socks5://10.0.0.1:1080"
-            class="flex-1 rounded-xl bg-slate-900 border border-slate-700 focus:border-indigo-500 px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none"
+            class="flex-1 rounded-xl bg-white border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 outline-none"
           />
           <button
             id="addProxySubmitBtn"
             type="submit"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer"
           >
             <i data-lucide="plus" class="w-4 h-4"></i>
             <span>Add Proxy</span>
           </button>
         </div>
         <div class="flex items-center justify-between pt-1">
-          <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
-            <input id="checkProxyImmediateCheckbox" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500" />
+          <label class="inline-flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+            <input id="checkProxyImmediateCheckbox" type="checkbox" checked class="rounded bg-white border-slate-300 text-indigo-600 focus:ring-indigo-500" />
             <span>Test connectivity immediately</span>
           </label>
-          <span id="proxyFormError" class="text-xs text-rose-400"></span>
+          <span id="proxyFormError" class="text-xs font-medium text-rose-600"></span>
         </div>
       </form>
 
       <!-- Proxies List -->
       <div>
-        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">Saved Proxy Servers</h4>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2.5">Saved Proxy Servers</h4>
         <div id="proxiesListContainer" class="space-y-2 max-h-72 overflow-y-auto pr-1">
           <p class="text-xs text-slate-500 py-4 text-center">No proxies configured yet.</p>
         </div>
@@ -467,6 +516,18 @@
     let lastSeenItemsScraped = -1;
     let lastKnownRunningState = false;
     let searchDebounceTimer = null;
+
+    function stepInput(inputId, delta) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const min = input.min !== "" ? parseFloat(input.min) : -Infinity;
+      const max = input.max !== "" ? parseFloat(input.max) : Infinity;
+      const current = parseFloat(input.value) || 0;
+      let next = Math.round((current + delta) * 100) / 100;
+      if (next < min) next = min;
+      if (next > max) next = max;
+      input.value = next;
+    }
 
     function formatDuration(seconds) {
       if (seconds === null || seconds === undefined || isNaN(seconds) || seconds < 0) {
@@ -579,19 +640,19 @@
       const status = (statusData.status || "idle").toLowerCase();
       const isRunning = Boolean(statusData.is_running);
 
-      // Update Header Pill
+      // Update Header Pill (Light Theme palette)
       const pill = document.getElementById("headerStatusPill");
       const dot = document.getElementById("headerStatusDot");
       const text = document.getElementById("headerStatusText");
       text.textContent = status.toUpperCase();
 
       const pillStyles = {
-        idle: ["bg-slate-800 text-slate-300 border-slate-700", "bg-slate-400"],
-        running: ["bg-indigo-950 text-indigo-300 border-indigo-700", "bg-indigo-400 animate-ping"],
-        stopping: ["bg-amber-950 text-amber-300 border-amber-700", "bg-amber-400 animate-pulse"],
-        completed: ["bg-emerald-950 text-emerald-300 border-emerald-700", "bg-emerald-400"],
-        stopped: ["bg-amber-950 text-amber-300 border-amber-700", "bg-amber-400"],
-        error: ["bg-rose-950 text-rose-300 border-rose-700", "bg-rose-400"],
+        idle: ["bg-slate-100 text-slate-700 border-slate-200", "bg-slate-400"],
+        running: ["bg-indigo-50 text-indigo-700 border-indigo-200", "bg-indigo-600 animate-ping"],
+        stopping: ["bg-amber-50 text-amber-700 border-amber-200", "bg-amber-500 animate-pulse"],
+        completed: ["bg-emerald-50 text-emerald-700 border-emerald-200", "bg-emerald-500"],
+        stopped: ["bg-amber-50 text-amber-700 border-amber-200", "bg-amber-500"],
+        error: ["bg-rose-50 text-rose-700 border-rose-200", "bg-rose-500"],
       };
       const [pillCls, dotCls] = pillStyles[status] || pillStyles.idle;
       pill.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider border ${pillCls}`;
@@ -644,7 +705,7 @@
       }
 
       document.getElementById("metricItemsCount").textContent = String(statusData.items_scraped || 0);
-      document.getElementById("metricSpeed").innerHTML = `${Number(statusData.items_per_second || 0).toFixed(2)} <span class="text-xs font-normal text-slate-400">items/sec</span>`;
+      document.getElementById("metricSpeed").innerHTML = `${Number(statusData.items_per_second || 0).toFixed(2)} <span class="text-xs font-normal text-slate-500">items/sec</span>`;
       document.getElementById("lastUpdatedTime").textContent = `Synced: ${new Date().toLocaleTimeString()}`;
 
       if (status === "error" && statusData.error_message) {
@@ -707,21 +768,21 @@
         tbody.innerHTML = data.items
           .map((item) => {
             const imgHtml = item.image_url
-              ? `<img src="${escapeHtml(item.image_url)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" class="w-12 h-12 rounded-lg object-cover bg-slate-800 border border-slate-700 shrink-0" /><div style="display:none" class="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 items-center justify-center text-slate-500 shrink-0 text-xs">IMG</div>`
-              : `<div class="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 shrink-0 text-xs">IMG</div>`;
+              ? `<img src="${escapeHtml(item.image_url)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" class="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 shrink-0" /><div style="display:none" class="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 items-center justify-center text-slate-400 shrink-0 text-[10px] font-medium">NO IMG</div>`
+              : `<div class="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0 text-[10px] font-medium">NO IMG</div>`;
 
             const origPriceHtml =
               item.original_price && item.original_price > item.price
-                ? `<span class="block text-xs text-slate-500 line-through">${escapeHtml(item.currency)} ${Number(item.original_price).toFixed(2)}</span>`
+                ? `<span class="block text-xs text-slate-400 line-through">${escapeHtml(item.currency)} ${Number(item.original_price).toFixed(2)}</span>`
                 : "";
 
             const ratingHtml =
               item.rating !== null && item.rating !== undefined
-                ? `<span class="inline-flex items-center gap-1 text-amber-400 font-semibold text-xs">★ ${Number(item.rating).toFixed(1)}</span>`
-                : `<span class="text-xs text-slate-500">No rating</span>`;
+                ? `<span class="inline-flex items-center gap-1 text-amber-500 font-semibold text-xs">★ ${Number(item.rating).toFixed(1)}</span>`
+                : `<span class="text-xs text-slate-400">No rating</span>`;
 
             const ordersHtml = item.orders_count
-              ? `<span class="inline-block px-2 py-0.5 rounded-md text-[11px] bg-slate-800 text-slate-300 border border-slate-700">${escapeHtml(item.orders_count)}</span>`
+              ? `<span class="inline-block px-2 py-0.5 rounded-md text-[11px] bg-slate-100 text-slate-700 border border-slate-200">${escapeHtml(item.orders_count)}</span>`
               : "";
 
             const scrapedDate = item.scraped_at
@@ -729,23 +790,23 @@
               : "—";
 
             return `
-              <tr class="hover:bg-slate-800/40 transition-colors">
+              <tr class="hover:bg-slate-50/90 transition-colors">
                 <td class="py-3 px-4 max-w-md">
                   <div class="flex items-start gap-3">
                     ${imgHtml}
                     <div class="min-w-0">
-                      <a href="${escapeHtml(item.product_url)}" target="_blank" rel="noopener noreferrer" class="font-medium text-slate-100 hover:text-indigo-400 line-clamp-2 transition-colors">
+                      <a href="${escapeHtml(item.product_url)}" target="_blank" rel="noopener noreferrer" class="font-medium text-slate-900 hover:text-indigo-600 line-clamp-2 transition-colors">
                         ${escapeHtml(item.title)}
                       </a>
-                      <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
+                      <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-500">
                         <span class="font-mono">ID: ${escapeHtml(item.item_id)}</span>
-                        ${item.category_or_query ? `<span class="px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 border border-slate-700">${escapeHtml(item.category_or_query)}</span>` : ""}
+                        ${item.category_or_query ? `<span class="px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-medium">${escapeHtml(item.category_or_query)}</span>` : ""}
                       </div>
                     </div>
                   </div>
                 </td>
                 <td class="py-3 px-4 whitespace-nowrap">
-                  <span class="font-bold text-emerald-400">${escapeHtml(item.currency)} ${Number(item.price).toFixed(2)}</span>
+                  <span class="font-bold text-emerald-600">${escapeHtml(item.currency)} ${Number(item.price).toFixed(2)}</span>
                   ${origPriceHtml}
                 </td>
                 <td class="py-3 px-4 whitespace-nowrap">
@@ -754,10 +815,10 @@
                     ${ordersHtml}
                   </div>
                 </td>
-                <td class="py-3 px-4 text-xs text-slate-300 max-w-[160px] truncate">
+                <td class="py-3 px-4 text-xs text-slate-700 max-w-[160px] truncate">
                   ${escapeHtml(item.store_name || "—")}
                 </td>
-                <td class="py-3 px-4 text-xs text-slate-400 whitespace-nowrap">
+                <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">
                   ${escapeHtml(scrapedDate)}
                 </td>
                 <td class="py-3 px-4 text-right whitespace-nowrap">
@@ -765,9 +826,9 @@
                     href="${escapeHtml(item.product_url)}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 transition-colors"
+                    class="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 hover:border-indigo-600 transition-colors"
                   >
-                    <span>View Item ↗</span>
+                    <span>View Item</span>
                   </a>
                 </td>
               </tr>
@@ -825,7 +886,9 @@
       }
     }
 
-    function exportExcel() {
+    async function exportExcel() {
+      const btn = document.getElementById("exportExcelBtn");
+      const btnText = document.getElementById("exportExcelBtnText");
       const search = document.getElementById("productSearchInput").value.trim();
       const taskId = document.getElementById("taskFilterSelect").value;
       const params = new URLSearchParams();
@@ -833,7 +896,32 @@
       if (taskId) params.set("task_id", taskId);
 
       const queryStr = params.toString();
-      window.location.href = queryStr ? `/api/products/export?${queryStr}` : "/api/products/export";
+      const url = queryStr ? `/api/products/export?${queryStr}` : "/api/products/export";
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.textContent = "Exporting...";
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          showErrorBanner("Failed to export Excel file (HTTP " + res.status + ")");
+          return;
+        }
+        const blob = await res.blob();
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = "aliexpress_products.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(downloadUrl), 5000);
+      } catch (err) {
+        showErrorBanner("Export error: " + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.textContent = "Export Excel (.xlsx)";
+      }
     }
 
     async function loadProxies() {
@@ -871,21 +959,21 @@
 
         listContainer.innerHTML = proxies
           .map((p) => {
-            let badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">Untested</span>`;
+            let badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">Untested</span>`;
             if (p.is_working === true) {
-              badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/70">Online (${p.latency_ms ?? 0} ms)</span>`;
+              badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">Online (${p.latency_ms ?? 0} ms)</span>`;
             } else if (p.is_working === false) {
-              badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-950 text-rose-300 border border-rose-700/70">Offline</span>`;
+              badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-50 text-rose-700 border border-rose-200">Offline</span>`;
             }
 
-            const authLabel = p.username ? `<span class="text-[11px] text-indigo-300">Auth: ${escapeHtml(p.username)}</span>` : `<span class="text-[11px] text-slate-500">No Auth</span>`;
+            const authLabel = p.username ? `<span class="text-[11px] text-indigo-600 font-medium">Auth: ${escapeHtml(p.username)}</span>` : `<span class="text-[11px] text-slate-500">No Auth</span>`;
 
             return `
-              <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+              <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div class="min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">${escapeHtml(p.protocol)}</span>
-                    <span class="font-mono text-xs text-white truncate">${escapeHtml(p.host)}:${p.port}</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-50 text-indigo-700 border border-indigo-200">${escapeHtml(p.protocol)}</span>
+                    <span class="font-mono text-xs text-slate-900 font-semibold truncate">${escapeHtml(p.host)}:${p.port}</span>
                     ${badgeHtml}
                   </div>
                   <div class="mt-1 flex items-center gap-3">
@@ -897,14 +985,14 @@
                     type="button"
                     id="checkProxyBtn-${p.id}"
                     onclick="handleCheckProxy(${p.id})"
-                    class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition cursor-pointer"
                   >
                     Check
                   </button>
                   <button
                     type="button"
                     onclick="handleDeleteProxy(${p.id})"
-                    class="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/60 transition"
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition cursor-pointer"
                   >
                     Delete
                   </button>

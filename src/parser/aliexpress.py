@@ -235,14 +235,98 @@ class AliExpressScraper:
                 except Exception:
                     break
 
-            # Extract raw item structures from DOM cards and scripts
+            # Extract raw item structures from _dida_config_ JSON state + DOM cards
             raw_data = await page.evaluate(
                 """() => {
+                const BADGE_URL_PATTERNS = [
+                    '154x64',
+                    '110x42',
+                    '48x48',
+                    '60x60',
+                    '702x72',
+                    '116x64',
+                    'S1887a285b60743859ac7bdbfca5e0896Z',
+                    'Sb008eb53e92f463eb0a2c17c539df530h',
+                    'S5efe9a37755e44cfa878e2e714900709h',
+                    'Sca75952228bb4507ac311d1b43e10721q',
+                    'S135d2af8d57840b28092ceba069bdb6c4'
+                ];
+                const BADGE_CLASS_PATTERNS = [
+                    'titleIcon',
+                    'scarf',
+                    'starScore',
+                    'cpvIcon',
+                    'badge',
+                    'logo',
+                    'icon'
+                ];
+
+                function isBadgeOrIconUrl(url, imgEl) {
+                    if (!url || typeof url !== 'string') return true;
+                    for (const pat of BADGE_URL_PATTERNS) {
+                        if (url.includes(pat)) return true;
+                    }
+                    if (imgEl) {
+                        const cls = String(imgEl.className || '') + ' ' + String(imgEl.parentElement?.className || '');
+                        const clsLower = cls.toLowerCase();
+                        for (const cPat of BADGE_CLASS_PATTERNS) {
+                            if (cls.includes(cPat) || clsLower.includes(cPat.toLowerCase())) {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                }
+
+                function normalizeImgUrl(rawUrl) {
+                    if (!rawUrl || typeof rawUrl !== 'string') return '';
+                    let u = rawUrl.trim();
+                    if (u.startsWith('//')) u = 'https:' + u;
+                    return u;
+                }
+
+                // 1. Extract structured items from window._dida_config_._init_data_
+                const jsonItemsById = {};
+                try {
+                    const initDataRoot = window._dida_config_?._init_data_?.data?.data;
+                    let contentList = initDataRoot?.root?.fields?.mods?.itemList?.content || [];
+                    if (!Array.isArray(contentList) || contentList.length === 0) {
+                        if (initDataRoot && typeof initDataRoot === 'object') {
+                            for (const k of Object.keys(initDataRoot)) {
+                                const maybeList = initDataRoot[k]?.fields?.mods?.itemList?.content;
+                                if (Array.isArray(maybeList) && maybeList.length > 0) {
+                                    contentList = maybeList;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (Array.isArray(contentList)) {
+                        for (const item of contentList) {
+                            const pid = String(item?.productId || item?.redirectedId || '').trim();
+                            if (!pid) continue;
+                            const rawImg = item?.image?.imgUrl || (Array.isArray(item?.images) && item.images[0]?.imgUrl) || '';
+                            const cleanImg = normalizeImgUrl(rawImg);
+                            jsonItemsById[pid] = {
+                                img: !isBadgeOrIconUrl(cleanImg, null) ? cleanImg : '',
+                                title: String(item?.title?.displayTitle || '').trim(),
+                                salePrice: item?.prices?.salePrice?.minPrice,
+                                origPrice: item?.prices?.originalPrice?.minPrice,
+                                currency: String(item?.prices?.salePrice?.currencyCode || 'USD').trim(),
+                                rating: item?.evaluation?.starRating,
+                                trade: String(item?.trade?.tradeDesc || '').trim(),
+                                store: String(item?.store?.storeName || '').trim()
+                            };
+                        }
+                    }
+                } catch (_) {}
+
                 const results = [];
                 const seen = new Set();
 
+                // 2. Traverse DOM cards (excluding multi--content-- which lacks the image container)
                 const cards = document.querySelectorAll(
-                    '.search-card-item, [class*="search-card-item"], [class*="search-item"], [class*="multi--content--"]'
+                    '.search-card-item, [class*="search-card-item"], [class*="cards--card--"]'
                 );
 
                 for (const card of cards) {
@@ -268,12 +352,27 @@ class AliExpressScraper:
                     if (!itemId || seen.has(itemId)) continue;
                     seen.add(itemId);
 
-                    const titleEl = card.querySelector('h3, [class*="titleText"], [class*="title--"]');
-                    const title = titleEl ? titleEl.textContent.trim() : '';
+                    const jItem = jsonItemsById[itemId] || {};
 
-                    const imgEl = card.querySelector('img');
-                    let img = imgEl ? (imgEl.src || imgEl.getAttribute('src') || imgEl.getAttribute('data-src') || imgEl.getAttribute('image-src') || '') : '';
-                    if (img.startsWith('//')) img = 'https:' + img;
+                    const titleEl = card.querySelector('h3, [class*="titleText"], [class*="title--"]');
+                    const title = (titleEl ? titleEl.textContent.trim() : '') || jItem.title || '';
+
+                    // Select clean product image: priority 1 = JSON state, priority 2 = filtered card <img>
+                    let img = jItem.img || '';
+                    if (!img) {
+                        const candidateImgs = [
+                            ...Array.from(card.querySelectorAll('img[class*="images--item"], img[class*="product-img"]')),
+                            ...Array.from(card.querySelectorAll('img'))
+                        ];
+                        for (const imgEl of candidateImgs) {
+                            const rawSrc = imgEl.getAttribute('src') || imgEl.src || imgEl.getAttribute('data-src') || imgEl.getAttribute('image-src') || '';
+                            const normSrc = normalizeImgUrl(rawSrc);
+                            if (normSrc && !isBadgeOrIconUrl(normSrc, imgEl)) {
+                                img = normSrc;
+                                break;
+                            }
+                        }
+                    }
 
                     const saleEl = card.querySelector('[class*="price-sale--"], [class*="salePrice"]');
                     const saleText = saleEl ? saleEl.textContent.trim() : '';
@@ -285,10 +384,10 @@ class AliExpressScraper:
                     const ratingText = ratingEl ? ratingEl.textContent.trim() : '';
 
                     const tradeEl = card.querySelector('[class*="trade--"]');
-                    const tradeText = tradeEl ? tradeEl.textContent.trim() : '';
+                    const tradeText = (tradeEl ? tradeEl.textContent.trim() : '') || jItem.trade || '';
 
                     const storeEl = card.querySelector('a[href*="/store/"], [class*="store--"], [class*="shopName"]');
-                    const storeText = storeEl ? storeEl.textContent.trim() : '';
+                    const storeText = (storeEl ? storeEl.textContent.trim() : '') || jItem.store || '';
 
                     const lines = card.innerText ? card.innerText.split('\\n').map(s => s.trim()).filter(Boolean) : [];
 
@@ -298,10 +397,35 @@ class AliExpressScraper:
                         img: img,
                         saleText: saleText,
                         origText: origText,
+                        jsonSalePrice: jItem.salePrice,
+                        jsonOrigPrice: jItem.origPrice,
+                        jsonCurrency: jItem.currency,
                         ratingText: ratingText,
+                        jsonRating: jItem.rating,
                         tradeText: tradeText,
                         storeText: storeText,
                         lines: lines
+                    });
+                }
+
+                // 3. Append any remaining items from JSON state that were not yet rendered in DOM
+                for (const [itemId, jItem] of Object.entries(jsonItemsById)) {
+                    if (seen.has(itemId)) continue;
+                    seen.add(itemId);
+                    results.push({
+                        itemId: itemId,
+                        title: jItem.title || '',
+                        img: jItem.img || '',
+                        saleText: '',
+                        origText: '',
+                        jsonSalePrice: jItem.salePrice,
+                        jsonOrigPrice: jItem.origPrice,
+                        jsonCurrency: jItem.currency || 'USD',
+                        ratingText: '',
+                        jsonRating: jItem.rating,
+                        tradeText: jItem.trade || '',
+                        storeText: jItem.store || '',
+                        lines: []
                     });
                 }
 
@@ -334,6 +458,19 @@ class AliExpressScraper:
                 if raw.get("origText"):
                     orig_price, _ = parse_price_and_currency(raw.get("origText"), curr)
 
+                if price is None and raw.get("jsonSalePrice") is not None:
+                    try:
+                        price = round(float(raw["jsonSalePrice"]), 2)
+                        curr = str(raw.get("jsonCurrency") or "USD")
+                    except (ValueError, TypeError):
+                        pass
+
+                if orig_price is None and raw.get("jsonOrigPrice") is not None:
+                    try:
+                        orig_price = round(float(raw["jsonOrigPrice"]), 2)
+                    except (ValueError, TypeError):
+                        pass
+
                 if price is None and lines:
                     for line in lines:
                         p_val, p_curr = parse_price_and_currency(line)
@@ -354,6 +491,14 @@ class AliExpressScraper:
                         if 1.0 <= val <= 5.0:
                             rating = val
                     except ValueError:
+                        pass
+
+                if rating is None and raw.get("jsonRating") is not None:
+                    try:
+                        val = float(raw["jsonRating"])
+                        if 1.0 <= val <= 5.0:
+                            rating = round(val, 1)
+                    except (ValueError, TypeError):
                         pass
 
                 if rating is None and lines:

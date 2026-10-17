@@ -31,9 +31,13 @@ def run_pwa_tests() -> None:
         "Export Excel",
         "Proxy Manager",
         "manifest.json",
+        "bg-slate-50",
+        "stepInput",
     ):
         assert expected_phrase in html_text, f"Missing expected English UI element '{expected_phrase}' in index.html"
-    logger.info("  [OK] GET / returned 200 OK with all required English UI elements")
+    assert "View Item ↗" not in html_text, "Found forbidden 'View Item ↗' arrow in index.html"
+    assert ">View Item<" in html_text, "Missing clean 'View Item' button in index.html"
+    logger.info("  [OK] GET / returned 200 OK with Light Theme, custom steppers, and clean View Item button")
 
     # 2. Test GET /manifest.json
     logger.info("Step 2: Testing GET /manifest.json...")
@@ -41,6 +45,7 @@ def run_pwa_tests() -> None:
     assert res_manifest.status_code == 200
     manifest_data = res_manifest.json()
     assert "name" in manifest_data and "AliParser" in manifest_data["name"]
+    assert manifest_data.get("background_color") == "#f8fafc"
     assert "icons" in manifest_data and len(manifest_data["icons"]) > 0
     logger.info("  [OK] GET /manifest.json returned valid Web App Manifest ('%s')", manifest_data["name"])
 
