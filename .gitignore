@@ -19,6 +19,7 @@ exports/
 # Playwright / Browsers
 .playwright/
 test-results/
+test_results.json
 
 # Node / Frontend
 node_modules/
