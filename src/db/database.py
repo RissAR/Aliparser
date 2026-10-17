@@ -2,12 +2,12 @@
 
 import os
 from datetime import datetime, timezone
-from typing import Generator, List, Optional
+from typing import Any, Generator, List, Optional
 
-from sqlalchemy import create_engine, or_, select, update
+from sqlalchemy import create_engine, event, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.db.models import Base, Product
+from src.db.models import Base, ParsingTask, Product, utc_now
 from src.parser.aliexpress import AliProductItem
 
 # Ensure data directory exists
@@ -17,8 +17,19 @@ SQLALCHEMY_DATABASE_URL = "sqlite:///data/aliparser.db"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 30},
 )
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragma(dbapi_connection: Any, _connection_record: Any) -> None:
+    """Configure SQLite WAL journal mode and busy timeout for concurrent access."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
+    cursor.execute("PRAGMA busy_timeout=30000;")
+    cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -36,13 +47,20 @@ BADGE_IMAGE_SUBSTRINGS = (
 
 
 def init_db() -> None:
-    """Create database directory, initialize all SQLAlchemy tables, and clean legacy badge image URLs."""
+    """Create database directory, initialize all SQLAlchemy tables, clean legacy badge URLs, and recover stale tasks."""
     os.makedirs("data", exist_ok=True)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         conditions = [Product.image_url.like(f"%{pat}%") for pat in BADGE_IMAGE_SUBSTRINGS]
         stmt = update(Product).where(or_(*conditions)).values(image_url="")
         db.execute(stmt)
+
+        stale_tasks_stmt = (
+            update(ParsingTask)
+            .where(ParsingTask.status.in_(["running", "stopping"]))
+            .values(status="stopped", finished_at=utc_now())
+        )
+        db.execute(stale_tasks_stmt)
         db.commit()
 
 

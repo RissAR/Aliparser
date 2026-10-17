@@ -194,50 +194,10 @@ class AliExpressScraper:
 
         await page.route("**/*", route_handler)
 
-    async def scrape_page(self, target: str, page_number: int = 1) -> List[AliProductItem]:
-        """Scrape product listings from a target search query or category URL.
-
-        Args:
-            target: Search query (e.g. "wireless mouse") or full category/catalog URL.
-            page_number: Target page number (1-indexed).
-
-        Returns:
-            List of parsed AliProductItem models.
-        """
-        if self._context is None:
-            await self.start()
-
-        if self._context is None:
-            raise RuntimeError("Scraper browser context failed to initialize.")
-
-        page = await self._context.new_page()
-        try:
-            await self._setup_page_routes(page)
-
-            url = self._build_target_url(target, page_number)
-            logger.info("Navigating to target URL: %s", url)
-
-            try:
-                response = await page.goto(url, wait_until="domcontentloaded", timeout=45000)
-                if response and response.status >= 400:
-                    logger.warning("Target URL responded with status %d", response.status)
-            except Exception as e:
-                logger.warning("Initial navigation warning/timeout: %s", e)
-
-            # Wait briefly for dynamic DOM hydration
-            await page.wait_for_timeout(1500)
-
-            # Progressive scroll to trigger lazy-loaded cards
-            for _ in range(4):
-                try:
-                    await page.evaluate("window.scrollBy(0, 1000)")
-                    await page.wait_for_timeout(700)
-                except Exception:
-                    break
-
-            # Extract raw item structures from _dida_config_ JSON state + DOM cards
-            raw_data = await page.evaluate(
-                """() => {
+    async def _extract_items_from_page(self, page: Page) -> List[Dict[str, Any]]:
+        """Extract raw product item structures from _dida_config_ JSON state and DOM cards."""
+        raw_data = await page.evaluate(
+            """() => {
                 const BADGE_URL_PATTERNS = [
                     '154x64',
                     '110x42',
@@ -431,7 +391,60 @@ class AliExpressScraper:
 
                 return results;
             }"""
-            )
+        )
+        return raw_data if isinstance(raw_data, list) else []
+
+    async def scrape_page(self, target: str, page_number: int = 1) -> List[AliProductItem]:
+        """Scrape product listings from a target search query or category URL.
+
+        Args:
+            target: Search query (e.g. "wireless mouse") or full category/catalog URL.
+            page_number: Target page number (1-indexed).
+
+        Returns:
+            List of parsed AliProductItem models.
+        """
+        if self._context is None:
+            await self.start()
+
+        if self._context is None:
+            raise RuntimeError("Scraper browser context failed to initialize.")
+
+        page = await self._context.new_page()
+        try:
+            await self._setup_page_routes(page)
+
+            url = self._build_target_url(target, page_number)
+            logger.info("Navigating to target URL: %s", url)
+
+            try:
+                response = await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+                if response and response.status >= 400:
+                    logger.warning("Target URL responded with status %d", response.status)
+            except Exception as e:
+                logger.warning("Initial navigation warning/timeout: %s", e)
+
+            # Wait briefly for dynamic DOM hydration
+            await page.wait_for_timeout(1500)
+
+            # Progressive scroll to trigger lazy-loaded cards
+            for _ in range(4):
+                try:
+                    await page.evaluate("window.scrollBy(0, 1000)")
+                    await page.wait_for_timeout(700)
+                except Exception:
+                    break
+
+            raw_data = await self._extract_items_from_page(page)
+            if len(raw_data) == 0:
+                logger.info("Initial extraction returned 0 items on page %d; retrying after extra wait...", page_number)
+                await page.wait_for_timeout(2000)
+                try:
+                    await page.evaluate("window.scrollTo(0, 600)")
+                    await page.wait_for_timeout(800)
+                except Exception:
+                    pass
+                raw_data = await self._extract_items_from_page(page)
 
             items: List[AliProductItem] = []
             seen_ids = set()
