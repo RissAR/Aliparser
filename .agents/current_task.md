@@ -1,174 +1,151 @@
-# ТЗ №4: REST API (FastAPI) та Сервіс Експорту в Excel (.xlsx)
+# ТЗ №5: Англомовний PWA Веб-Інтерфейс (Progressive Web App Dashboard)
 
 ## Мета
-Побудувати повноцінний REST API на базі FastAPI для керування парсером, роботи зі списком товарів, управління проксі-серверами та вивантаження результатів у форматований Excel-файл (`.xlsx`) із клікабельними посиланнями на товари.
+Створити легкий, сучасний та повністю англомовний PWA-додаток (Progressive Web App), інтегрований із FastAPI бекендом, який дозволяє:
+1. Запускати та зупиняти парсер для будь-якої категорії або пошукового запиту AliExpress.
+2. Відстежувати живі індикатори роботи в реальному часі: поточний статус, анімований прогрес-бар, таймер витраченого часу (`Elapsed Time`), розрахунковий час до завершення (`ETA`), кількість зібраних товарів та швидкість збору.
+3. Керувати списком проксі-серверів (додавання, тестування пінгу/працездатності, видалення, вибір активного проксі для парсингу).
+4. Переглядати, шукати та фільтрувати зібрані товари прямо в таблиці з фотографіями, цінами, рейтингами та прямими клікабельними посиланнями на AliExpress.
+5. Вивантажувати зібрані товари в Excel (`.xlsx`) у 1 клік.
 
 ---
 
 ## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/Aliparser/
-├── requirements.txt                   # Додати fastapi, uvicorn, openpyxl
-├── run_app.py                         # Точка входу для запуску FastAPI сервера через uvicorn
 ├── src/
 │   ├── api/
-│   │   ├── __init__.py
-│   │   ├── schemas.py                 # Pydantic-схеми запитів та відповідей API
-│   │   └── app.py                     # FastAPI додаток та всі REST ендпоінти
-│   └── services/
-│       └── exporter.py                # Генерація .xlsx книги з форматуванням та гіперпосиланнями
+│   │   └── app.py                     # Підключення статики та маршрутів PWA (/, /manifest.json, /sw.js, /icon.svg)
+│   └── web/
+│       └── static/
+│           ├── index.html             # Головний англомовний інтерфейс (Tailwind CSS + Lucide Icons + JS)
+│           ├── manifest.json          # PWA Web App Manifest
+│           ├── sw.js                  # Service Worker для PWA
+│           └── icon.svg               # Векторна іконка додатка
 └── scripts/
-    └── test_api_and_export.py         # Комплексний тест усіх ендпоінтів API та структури Excel-файлу
+    └── test_pwa.py                    # Автономний тест доступності PWA-маршрутів та ресурсів
 ```
 
 ---
 
 ## Детальні вимоги до реалізації
 
-### 1. Оновлення `requirements.txt`
-Зберегти існуючі залежності та додати:
-* `fastapi>=0.110.0`
-* `uvicorn>=0.29.0`
-* `openpyxl>=3.1.2`
+### 1. Роздача статики та PWA маршрутів у `src/api/app.py`
+Додати в `src/api/app.py` (зберегти всі існуючі API-ендпоінти без змін):
+* Підключити `StaticFiles` для `/static` із папки `src/web/static`.
+* Додати маршрути (через `FileResponse`):
+  * `GET /` $\rightarrow$ `src/web/static/index.html`
+  * `GET /manifest.json` $\rightarrow$ `src/web/static/manifest.json` (`media_type="application/manifest+json"`)
+  * `GET /sw.js` $\rightarrow$ `src/web/static/sw.js` (`media_type="application/javascript"`)
+  * `GET /icon.svg` $\rightarrow$ `src/web/static/icon.svg` (`media_type="image/svg+xml"`)
 
 ---
 
-### 2. Сервіс експорту в Excel `src/services/exporter.py`
-Створити функцію `generate_products_excel(products: List[Product]) -> bytes`:
-* Використовує `openpyxl.Workbook()`. Назва активного аркуша: `"AliExpress Products"`.
-* **Заголовки стовпців (Рядок 1):**
-  1. `ID товару` (`item_id`)
-  2. `Назва товару` (`title`)
-  3. `Ціна` (`price` — числовий тип float)
-  4. `Стара ціна` (`original_price` — числовий тип float або порожньо)
-  5. `Валюта` (`currency`)
-  6. `Рейтинг` (`rating` — числовий тип float або порожньо)
-  7. `Замовлення` (`orders_count`)
-  8. `Магазин` (`store_name`)
-  9. `Категорія / Запит` (`category_or_query`)
-  10. `Посилання на товар` (`product_url`)
-  11. `Посилання на фото` (`image_url`)
-  12. `Дата збору (UTC)` (`scraped_at` у форматі `YYYY-MM-DD HH:MM:SS`)
-* **Стилізація та зручність:**
-  * Зафіксувати перший рядок: `ws.freeze_panes = "A2"`.
-  * Заголовок (рядок 1): жирний білий шрифт (`Font(bold=True, color="FFFFFF")`) на темному фоні (`PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")`), вирівнювання по центру.
-  * Для колонки 10 (`Посилання на товар`): у кожному рядку даних встановлювати `cell.hyperlink = product.product_url` та синій підкреслений шрифт (`Font(color="2563EB", underline="single")`), щоб користувач міг у 1 клік відкрити товар з Excel.
-  * Автоматичний підбір ширини колонок за довжиною вмісту з обмеженням `min_width = 12`, `max_width = 50`.
-* Зберігає книгу в `io.BytesIO()` та повертає `bytes`.
+### 2. PWA Конфігурація (`manifest.json`, `sw.js`, `icon.svg`)
+* `src/web/static/icon.svg`: стильна мінімалістична SVG-іконка (512x512 viewBox, градієнт indigo/orange, символ радара/кошика).
+* `src/web/static/manifest.json`:
+  * `name`: `"AliParser — AliExpress Scraper"`
+  * `short_name`: `"AliParser"`
+  * `start_url`: `"/"`
+  * `display`: `"standalone"`
+  * `background_color`: `"#0f172a"`
+  * `theme_color`: `"#4f46e5"`
+  * `icons`: посилання на `/icon.svg` (`sizes: "any"`, `type: "image/svg+xml"`, `purpose: "any maskable"`).
+* `src/web/static/sw.js`:
+  * Кешує базову оболонку (`/`, `/manifest.json`, `/icon.svg`).
+  * Для всіх запитів `/api/*` використовує `fetch(event.request)` (Network-only, без кешування динамічних даних API).
 
 ---
 
-### 3. Pydantic-схеми `src/api/schemas.py`
-Описати моделі (сумісні з Pydantic v2 `ConfigDict(from_attributes=True)`):
-* `StartParserRequest`:
-  * `target`: `str`
-  * `max_pages`: `int = Field(default=1, ge=1, le=50)`
-  * `proxy_id`: `Optional[int] = None`
-  * `delay_seconds`: `float = Field(default=1.5, ge=0.0, le=30.0)`
-* `TaskStatusResponse`:
-  * Повторює структуру словника `task_runner.get_status()` (`is_running`, `status`, `task_id`, `target`, `current_page`, `max_pages`, `completed_pages`, `progress_percent`, `items_scraped`, `proxy_id`, `started_at`, `finished_at`, `elapsed_seconds`, `estimated_remaining_seconds`, `items_per_second`, `error_message`).
-* `ProductResponse`:
-  * `id`: `int`, `item_id`: `str`, `title`: `str`, `price`: `float`, `original_price`: `Optional[float]`, `currency`: `str`, `rating`: `Optional[float]`, `orders_count`: `Optional[str]`, `store_name`: `Optional[str]`, `product_url`: `str`, `image_url`: `Optional[str]`, `category_or_query`: `Optional[str]`, `task_id`: `Optional[int]`, `scraped_at`: `datetime`
-* `ProductListResponse`:
-  * `total`: `int`
-  * `items`: `List[ProductResponse]`
-* `ProxyCreateRequest`:
-  * `raw_proxy`: `str`
-  * `check_connectivity`: `bool = False`
-* `ProxyResponse`:
-  * `id`: `int`, `raw_proxy`: `str`, `protocol`: `str`, `host`: `str`, `port`: `int`, `username`: `Optional[str]`, `is_active`: `bool`, `is_working`: `Optional[bool]`, `latency_ms`: `Optional[int]`, `last_checked_at`: `Optional[datetime]`, `created_at`: `datetime`
+### 3. Англомовний Інтерфейс `src/web/static/index.html`
+Усі написи, кнопки, підказки, статуси та таблиці мають бути **виключно англійською мовою**. Дизайн — сучасний темний дашборд (`bg-slate-950 text-slate-100`, картки `bg-slate-900 border-slate-800`, акценти `indigo-600` / `emerald-500`).
+
+#### А. Верхня панель (Header)
+* Логотип (`icon.svg`) + назва **"AliParser"** та підзаголовок `"Universal AliExpress Catalog & Search Scraper"`.
+* Живий індикатор стану парсера у шапці (`Status Pill`: `IDLE`, `RUNNING`, `STOPPING`, `COMPLETED`, `STOPPED`, `ERROR` з пульсуючою точкою під час роботи).
+* Кнопка **"Proxies (N)"** — відкриває модальне вікно керування проксі (`<dialog>`).
+* Кнопка **"Export Excel (.xlsx)"** — завантажує файл `/api/products/export` (з урахуванням поточного пошукового фільтра та обраної задачі).
+
+#### Б. Панель керування парсером (Scraper Control Card)
+* **Target Input (`target`):**
+  * Label: `"Search Query or Category URL"`
+  * Placeholder: `"e.g. wireless mechanical keyboard or https://www.aliexpress.com/category/..."`
+  * Швидкі чіпси (Quick Presets) під полем для зручного тестування в 1 клік: `wireless mouse`, `mechanical keyboard`, `usb c hub`, `smart watch`.
+* **Max Pages (`max_pages`):** числове поле (`1` – `50`, за замовчуванням `1`).
+* **Page Delay (`delay_seconds`):** числове поле (`0` – `30` sec, за замовчуванням `1.5`, крок `0.5`).
+* **Proxy Selector (`proxy_id`):** випадаючий список:
+  * За замовчуванням: `"Direct Connection (No Proxy)"` (`value=""`).
+  * Усі збережені проксі з `/api/proxies` із відображенням їхнього статусу та пінгу (`http://1.2.3.4:8080 [OK 120ms]`).
+* **Кнопки керування:**
+  * **"Start Scraping"**: відправляє `POST /api/parser/start`. Під час виконання парсингу кнопка стає неактивною (`disabled`) та показує обертовий спінер.
+  * **"Stop Parser"**: активна лише коли `is_running == true`, відправляє `POST /api/parser/stop` для безпечної зупинки.
+
+#### В. Панель живих індикаторів та таймерів (Live Telemetry & Progress Panel)
+Відображає телеметрію активного або останнього запуску (опитування `GET /api/parser/status` кожні `1000ms` під час роботи):
+1. **Progress Bar:** плавний смугастий прогрес-бар (`0%` – `100%`) + текст `"Page X of Y (Z%)"`.
+2. **Elapsed Time (Таймер роботи):** форматований час `MM:SS` на основі `elapsed_seconds`.
+3. **Estimated Remaining (ETA — Скільки часу залишилось):** форматований час `MM:SS` на основі `estimated_remaining_seconds` (наприклад, `"~00:14 remaining"`, або `"—"`, коли парсер у стані `idle`/`completed`).
+4. **Items Collected & Speed:** лічильник зібраних у поточній задачі товарів (`items_scraped`) та швидкість (`items_per_second` items/sec).
+5. **Error Banner:** якщо API повертає помилку або в статусі є `error_message` — показувати помітний червоний банер із текстом помилки та кнопкою закриття `"Dismiss"`.
+
+#### Г. Таблиця зібраних товарів (Scraped Products Catalog)
+* **Панель інструментів таблиці:**
+  * Поле пошуку `"Search products by title, store, or category..."` (із debounce 300ms).
+  * Випадаючий список фільтрації за задачею `"All Scraping Runs"` + список останніх задач із `GET /api/parser/tasks` (`#ID - target (N items)`).
+  * Лічильник: `"Total Products: N"`.
+  * Кнопка **"Refresh"** та кнопка **"Clear All"** (`DELETE /api/products` з підтвердженням).
+* **Стовпці таблиці:**
+  1. **Product** — мініатюра фото (`referrerpolicy="no-referrer"`, з акуратним fallback-іконкою при помилці завантаження), повна назва товару, ID товару (`ID: 100500...`) та тег категорії/запиту (`category_or_query`).
+  2. **Price** — актуальна ціна з валютою (`$19.99` або `UAH ...`), а поруч закреслена стара ціна (`original_price`), якщо вона є.
+  3. **Rating & Orders** — зірочка з рейтингом (`4.8`) та бейдж кількості замовлень (`500+ sold`).
+  4. **Store** — назва магазину (`store_name` або `"—"`).
+  5. **Scraped At** — дата та час збору.
+  6. **Action** — пряма кнопка-посилання **"View Item ↗"** (`href="${product_url}" target="_blank" rel="noopener noreferrer"`), що відкриває картку товару на AliExpress у новій вкладці.
+* Під час активного парсингу таблиця автоматично оновлюється при збільшенні `items_scraped`, щоб користувач одразу бачив нові товари на екрані.
+
+#### Д. Модальне вікно Проксі (Proxy Manager Modal)
+* Поле введення нового проксі (`host:port`, `host:port:user:pass`, `http://...`, `socks5://...`).
+* Чекбокс `"Test connectivity immediately"` (за замовчуванням увімкнений) + кнопка **"Add Proxy"**.
+* Список доданих проксі з відображенням:
+  * Адреса та протокол (`SOCKS5` / `HTTP`), наявність авторизації.
+  * Статус: зелений бейдж `"Online (115 ms)"`, червоний `"Offline"`, або сірий `"Untested"`.
+  * Кнопка **"Check"** (`POST /api/proxies/{id}/check`) зі спінером під час перевірки.
+  * Кнопка **"Delete"** (`DELETE /api/proxies/{id}`).
 
 ---
 
-### 4. FastAPI Додаток `src/api/app.py` та `run_app.py`
-* Ініціалізувати `init_db()` при старті модуля / lifespan.
-* Підключити `CORSMiddleware` (`allow_origins=["*"]`, `allow_methods=["*"]`, `allow_headers=["*"]`).
-* Реалізувати маршрути:
-
-#### А. Керування парсером
-1. `POST /api/parser/start` (`response_model=TaskStatusResponse`):
-   * Викликає `await task_runner.start_task(target=req.target, max_pages=req.max_pages, proxy_id=req.proxy_id, delay_seconds=req.delay_seconds)`.
-   * Якщо виникає `RuntimeError` (парсер вже працює) — повертає `HTTPException(status_code=409, detail=str(exc))`.
-   * Якщо виникає `ValueError` (невалідні параметри або неіснуючий `proxy_id`) — повертає `HTTPException(status_code=400, detail=str(exc))`.
-   * Повертає `task_runner.get_status()`.
-2. `GET /api/parser/status` (`response_model=TaskStatusResponse`):
-   * Повертає поточний стан та метрики `task_runner.get_status()`.
-3. `POST /api/parser/stop` (`response_model=TaskStatusResponse`):
-   * Викликає `await task_runner.stop_task()` і повертає оновлений статус.
-4. `GET /api/parser/tasks`:
-   * Повертає останні 20 записів `ParsingTask` з БД, відсортовані за `id.desc()`.
-
-#### Б. Робота з товарами та вивантаження в Excel
-5. `GET /api/products` (`response_model=ProductListResponse`):
-   * Параметри запиту: `search: Optional[str] = None`, `task_id: Optional[int] = None`, `limit: int = Query(default=100, ge=1, le=1000)`, `offset: int = Query(default=0, ge=0)`.
-   * Якщо передано `search` — фільтрує товари, де `title`, `store_name` або `category_or_query` містять підрядок (`ilike(f"%{search}%")`).
-   * Якщо передано `task_id` — додатково фільтрує за `Product.task_id == task_id`.
-   * Сортування: за `Product.scraped_at.desc(), Product.id.desc()`.
-   * Повертає загальну кількість (`total`) за фільтром та зріз `items`.
-6. `GET /api/products/export`:
-   * Приймає опціональні параметри фільтрації `search: Optional[str] = None`, `task_id: Optional[int] = None`.
-   * Вибирає всі відповідні товари з БД, генерує байти `.xlsx` через `generate_products_excel(products)`.
-   * Повертає `Response` з:
-     * `content=excel_bytes`
-     * `media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"`
-     * `headers={"Content-Disposition": 'attachment; filename="aliexpress_products.xlsx"'}`
-7. `DELETE /api/products`:
-   * Приймає опціональний параметр `task_id: Optional[int] = None`. Видаляє відповідні (або всі) товари з таблиці `products`. Повертає `{"deleted": deleted_count}`.
-
-#### В. Керування проксі
-8. `GET /api/proxies` (`response_model=List[ProxyResponse]`):
-   * Повертає список усіх проксі з БД (`order_by(Proxy.id.desc())`).
-9. `POST /api/proxies` (`response_model=ProxyResponse`):
-   * Парсить `req.raw_proxy` через `parse_proxy_string`. При `ValueError` повертає `HTTPException(status_code=400, detail=str(exc))`.
-   * Якщо проксі з таким `raw_proxy` вже існує в БД — оновлює його поля, інакше створює новий запис `Proxy`.
-   * Якщо `req.check_connectivity == True`, виконує `await check_proxy_connectivity(proxy_obj)`, записує `is_working`, `latency_ms` та `last_checked_at = utc_now()`.
-   * Зберігає в БД та повертає `ProxyResponse`.
-10. `POST /api/proxies/{proxy_id}/check` (`response_model=ProxyResponse`):
-    * Знаходить проксі за `proxy_id` (якщо немає — `404 Not Found`).
-    * Запускає `await check_proxy_connectivity(proxy_obj)`, оновлює `is_working`, `latency_ms`, `last_checked_at = utc_now()`, зберігає та повертає оновлений об'єкт.
-11. `DELETE /api/proxies/{proxy_id}`:
-    * Видаляє проксі за `proxy_id` (якщо немає — `404 Not Found`). Повертає `{"deleted": True, "id": proxy_id}`.
-
-#### Г. Точка входу `run_app.py`
-* Запускає сервер `uvicorn.run("src.api.app:app", host="0.0.0.0", port=8000, reload=False)`.
-
----
-
-### 5. Верифікаційний скрипт `scripts/test_api_and_export.py`
-Написати комплексний тест із використанням `fastapi.testclient.TestClient(app)`, який перевіряє:
-1. `GET /api/parser/status` — повертає 200 та валідну схему статусу.
-2. `POST /api/proxies` — успішне додавання проксі (`10.20.30.40:8080:myuser:mypass`), перевірка `400 Bad Request` на некоректний рядок (`invalid_proxy_str`), отримання списку `GET /api/proxies` та видалення `DELETE /api/proxies/{id}`.
-3. Додавання тестових товарів у БД та перевірка `GET /api/products` (загальний список + пошук `?search=...`).
-4. Перевірка `GET /api/products/export`:
-   * Статус `200`, заголовок `content-type` відповідає `.xlsx`.
-   * Завантаження байтів відповіді через `openpyxl.load_workbook(io.BytesIO(response.content))`.
-   * Перевірка наявності аркуша `"AliExpress Products"`, заголовків у 1-му рядку, даних у 2-му рядку та наявності клікабельного `cell.hyperlink.target` у колонці посилання на товар.
-5. Вивід фінального рядка: `ALL API & EXCEL EXPORT TESTS PASSED`.
+### 4. Верифікаційний скрипт `scripts/test_pwa.py`
+Написати тестовий скрипт з `TestClient(app)`, який перевіряє:
+1. `GET /` повертає `200 OK`, `text/html`, і містить ключові англомовні елементи інтерфейсу (`AliParser`, `Start Scraping`, `Export Excel`, `Proxy Manager`, `manifest.json`).
+2. `GET /manifest.json` повертає `200 OK` та валідний JSON з `"name"` та `"icons"`.
+3. `GET /sw.js` повертає `200 OK` та код Service Worker.
+4. `GET /icon.svg` повертає `200 OK` та `<svg`.
+5. Виводить у консоль: `ALL PWA FRONTEND TESTS PASSED`.
 
 ---
 
 ## Критерії приймання та верифікація (Verification)
-1. **Встановлення нових залежностей:**
+1. **Запуск тесту PWA:**
    ```bash
-   venv/bin/pip install -r requirements.txt
+   venv/bin/python scripts/test_pwa.py
    ```
-2. **Запуск комплексного тесту API та Excel-експорту:**
+   *Очікуваний результат:* виводиться `ALL PWA FRONTEND TESTS PASSED`.
+2. **Повторна перевірка існуючих API тестів (щоб переконатися у відсутності регресій):**
    ```bash
    venv/bin/python scripts/test_api_and_export.py
    ```
-   *Очікуваний результат:* усі перевірки проходять без помилок і виводиться `ALL API & EXCEL EXPORT TESTS PASSED`.
 
 ---
 
 ## Обов'язковий фінальний крок (Автоматичний Git Commit & Push)
 Після успішного проходження верифікації агент у Чаті 2 **ЗОБОВ'ЯЗАНИЙ самостійно виконати** в терміналі команду фіксації та відправки змін на GitHub:
 ```bash
-git add . && git commit -m "feat: implement FastAPI REST endpoints and Excel export service" && git push origin main
+git add . && git commit -m "feat: implement English PWA frontend dashboard with live telemetry, proxy manager, and Excel export" && git push origin main
 ```
 
 ---
 
 ## Формат звіту після виконання (у Чат 2)
 1. Список створених та модифікованих файлів.
-2. Лог виконання `scripts/test_api_and_export.py`.
+2. Лог виконання `scripts/test_pwa.py` та `scripts/test_api_and_export.py`.
 3. Підтвердження виконання `git commit` та `git push origin main` (із хешем коміту).
