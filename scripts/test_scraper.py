@@ -53,7 +53,7 @@ def parse_proxy_argument(proxy_str: Optional[str]) -> Optional[Dict[str, str]]:
 
 def print_products_table(items: List[AliProductItem], limit: int = 10) -> None:
     """Print formatted summary table for first N items."""
-    header = f"{'[ID]':<18} | {'[Ціна]':<14} | {'[Рейтинг]':<10} | {'[Замовлень]':<16} | {'[Назва]':<35} | {'[URL]'}"
+    header = f"{'[ID]':<18} | {'[Price]':<14} | {'[Rating]':<10} | {'[Orders]':<16} | {'[Title]':<35} | {'[URL]'}"
     separator = "-" * len(header)
     print("\n" + separator)
     print(header)

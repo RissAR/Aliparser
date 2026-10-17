@@ -11,6 +11,8 @@ ENV/
 
 # Data & SQLite
 *.db
+*.db-wal
+*.db-shm
 *.sqlite3
 data/
 downloads/
@@ -26,9 +28,10 @@ node_modules/
 dist/
 .cache/
 
-# Environment & IDE
+# Environment, IDE & Agent workspace
 .env
 .env.local
 .vscode/
 .idea/
+.agents/
 *.log
