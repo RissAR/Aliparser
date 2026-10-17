@@ -1,0 +1,17 @@
+{
+  "name": "AliParser — AliExpress Scraper",
+  "short_name": "AliParser",
+  "description": "Universal AliExpress Catalog & Search Scraper with Live Telemetry and Excel Export",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

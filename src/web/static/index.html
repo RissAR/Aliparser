@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="description" content="Universal AliExpress Catalog & Search Scraper with Live Telemetry and Excel Export" />
+  <title>AliParser — Universal AliExpress Catalog & Search Scraper</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @keyframes progress-stripes {
+      from { background-position: 1rem 0; }
+      to { background-position: 0 0; }
+    }
+    .progress-striped {
+      background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+      );
+      background-size: 1rem 1rem;
+      animation: progress-stripes 0.8s linear infinite;
+    }
+    dialog::backdrop {
+      background-color: rgba(2, 6, 23, 0.75);
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Top Header -->
+  <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
+        <img src="/icon.svg" alt="AliParser Logo" class="w-10 h-10 rounded-xl shadow-lg shadow-indigo-500/20" />
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="text-lg font-bold tracking-tight text-white">AliParser</h1>
+            <!-- Live Status Pill -->
+            <span id="headerStatusPill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+              <span id="headerStatusDot" class="w-2 h-2 rounded-full bg-slate-400"></span>
+              <span id="headerStatusText">IDLE</span>
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Universal AliExpress Catalog &amp; Search Scraper</p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center gap-2.5">
+        <button
+          id="openProxyModalBtn"
+          type="button"
+          onclick="openProxyModal()"
+          class="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+        >
+          <i data-lucide="shield-check" class="w-4 h-4 text-indigo-400"></i>
+          <span id="proxiesCountBtnText">Proxies (0)</span>
+        </button>
+
+        <button
+          id="exportExcelBtn"
+          type="button"
+          onclick="exportExcel()"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-900/40 transition-colors"
+        >
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          <span>Export Excel (.xlsx)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Error Banner -->
+    <div id="errorBanner" class="hidden rounded-xl bg-rose-950/80 border border-rose-700/80 p-4 text-rose-200 shadow-lg">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400 shrink-0"></i>
+          <div>
+            <p class="text-sm font-semibold text-rose-100">Scraper Alert / Error</p>
+            <p id="errorBannerMessage" class="text-xs text-rose-200 mt-0.5"></p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="dismissErrorBanner()"
+          class="px-2.5 py-1 rounded-md text-xs font-medium bg-rose-900/70 hover:bg-rose-800 text-rose-100 border border-rose-700/60 transition-colors"
+        >
+          Dismiss
+        </button>
+      </div>
+    </div>
+
+    <!-- Top Grid: Control Card + Live Telemetry Panel -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- B. Scraper Control Card -->
+      <section class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+            <span>Scraper Control Center</span>
+          </h2>
+          <span class="text-xs text-slate-400">Playwright Stealth Engine</span>
+        </div>
+
+        <form id="scraperForm" onsubmit="handleStartScraping(event)" class="space-y-4">
+          <!-- Target Input -->
+          <div>
+            <label for="targetInput" class="block text-xs font-medium text-slate-300 mb-1.5">
+              Search Query or Category URL
+            </label>
+            <div class="relative">
+              <input
+                id="targetInput"
+                type="text"
+                required
+                value="wireless mouse"
+                placeholder="e.g. wireless mechanical keyboard or https://www.aliexpress.com/category/..."
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition"
+              />
+            </div>
+            <!-- Quick Presets -->
+            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+              <span class="text-[11px] text-slate-400 mr-1">Quick Presets:</span>
+              <button type="button" onclick="setPreset('wireless mouse')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">wireless mouse</button>
+              <button type="button" onclick="setPreset('mechanical keyboard')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">mechanical keyboard</button>
+              <button type="button" onclick="setPreset('usb c hub')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">usb c hub</button>
+              <button type="button" onclick="setPreset('smart watch')" class="px-2.5 py-0.5 rounded-md text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/80 transition">smart watch</button>
+            </div>
+          </div>
+
+          <!-- Numeric & Proxy Parameters -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label for="maxPagesInput" class="block text-xs font-medium text-slate-300 mb-1">
+                Max Pages (1–50)
+              </label>
+              <input
+                id="maxPagesInput"
+                type="number"
+                min="1"
+                max="50"
+                value="1"
+                required
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-2 text-sm text-white outline-none"
+              />
+            </div>
+
+            <div>
+              <label for="delayInput" class="block text-xs font-medium text-slate-300 mb-1">
+                Page Delay (sec)
+              </label>
+              <input
+                id="delayInput"
+                type="number"
+                min="0"
+                max="30"
+                step="0.5"
+                value="1.5"
+                required
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-2 text-sm text-white outline-none"
+              />
+            </div>
+
+            <div>
+              <label for="proxySelect" class="block text-xs font-medium text-slate-300 mb-1">
+                Connection Proxy
+              </label>
+              <select
+                id="proxySelect"
+                class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="">Direct Connection (No Proxy)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Control Buttons -->
+          <div class="flex items-center gap-3 pt-1">
+            <button
+              id="startScrapingBtn"
+              type="submit"
+              class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900/50 disabled:text-slate-400 disabled:cursor-not-allowed text-white shadow-md shadow-indigo-950/60 transition-colors"
+            >
+              <span id="startBtnSpinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              <i id="startBtnIcon" data-lucide="play" class="w-4 h-4"></i>
+              <span id="startBtnText">Start Scraping</span>
+            </button>
+
+            <button
+              id="stopScrapingBtn"
+              type="button"
+              disabled
+              onclick="handleStopScraping()"
+              class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:border-slate-700 disabled:cursor-not-allowed text-white border border-rose-500/40 transition-colors"
+            >
+              <i data-lucide="square" class="w-4 h-4"></i>
+              <span>Stop Parser</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- C. Live Telemetry & Progress Panel -->
+      <section class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+              <span>Live Telemetry &amp; Progress</span>
+            </h2>
+            <span id="telemetryTaskBadge" class="text-xs font-mono text-slate-400">No active run</span>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="mb-5">
+            <div class="flex items-center justify-between text-xs mb-1.5">
+              <span id="progressPageLabel" class="font-medium text-slate-300">Page 0 of 0 (0%)</span>
+              <span id="progressTargetLabel" class="text-slate-400 truncate max-w-[200px]">Ready</span>
+            </div>
+            <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+              <div
+                id="progressBarFill"
+                class="h-full rounded-full bg-gradient-to-r from-indigo-600 to-emerald-500 transition-all duration-300"
+                style="width: 0%"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Telemetry Metrics Cards -->
+          <div class="grid grid-cols-2 gap-3">
+            <!-- Elapsed Time -->
+            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span>Elapsed Time</span>
+              </div>
+              <p id="metricElapsed" class="text-xl font-bold font-mono text-white mt-1">00:00</p>
+            </div>
+
+            <!-- Estimated Remaining (ETA) -->
+            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <i data-lucide="hourglass" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Estimated Remaining</span>
+              </div>
+              <p id="metricEta" class="text-xl font-bold font-mono text-amber-300 mt-1">—</p>
+            </div>
+
+            <!-- Items Collected -->
+            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <i data-lucide="package-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Items Collected</span>
+              </div>
+              <p id="metricItemsCount" class="text-xl font-bold font-mono text-emerald-400 mt-1">0</p>
+            </div>
+
+            <!-- Scraping Speed -->
+            <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3">
+              <div class="text-[11px] uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <i data-lucide="zap" class="w-3.5 h-3.5 text-sky-400"></i>
+                <span>Collection Speed</span>
+              </div>
+              <p id="metricSpeed" class="text-xl font-bold font-mono text-sky-300 mt-1">0.00 <span class="text-xs font-normal text-slate-400">items/sec</span></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+          <span>Auto-saves products per page</span>
+          <span id="lastUpdatedTime">Synced: Just now</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- D. Scraped Products Catalog Table -->
+    <section class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+      <!-- Table Toolbar -->
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5">
+        <div class="flex flex-wrap items-center gap-3">
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            <i data-lucide="shopping-bag" class="w-4 h-4 text-indigo-400"></i>
+            <span>Scraped Products Catalog</span>
+          </h2>
+          <span id="totalProductsBadge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-300 border border-indigo-800/70">
+            Total Products: 0
+          </span>
+        </div>
+
+        <!-- Filters & Table Actions -->
+        <div class="flex flex-wrap items-center gap-2.5">
+          <!-- Search input -->
+          <div class="relative flex-1 sm:w-64">
+            <input
+              id="productSearchInput"
+              type="text"
+              oninput="handleSearchDebounce()"
+              placeholder="Search products by title, store, or category..."
+              class="w-full rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 pl-3.5 pr-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none"
+            />
+          </div>
+
+          <!-- Task Run Filter -->
+          <select
+            id="taskFilterSelect"
+            onchange="loadProducts()"
+            aria-label="Filter by Scraping Run"
+            class="rounded-xl bg-slate-950 border border-slate-700 focus:border-indigo-500 px-3 py-1.5 text-xs text-slate-200 outline-none"
+          >
+            <option value="">All Scraping Runs</option>
+          </select>
+
+          <button
+            type="button"
+            onclick="refreshAllData()"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+          >
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="handleClearProducts()"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-950/70 hover:bg-rose-900/80 text-rose-200 border border-rose-800/60 transition"
+          >
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Clear All</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Products Table Wrapper -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 bg-slate-950/60 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              <th class="py-3 px-4">Product</th>
+              <th class="py-3 px-4">Price</th>
+              <th class="py-3 px-4">Rating &amp; Orders</th>
+              <th class="py-3 px-4">Store</th>
+              <th class="py-3 px-4">Scraped At</th>
+              <th class="py-3 px-4 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody id="productsTableBody" class="divide-y divide-slate-800/70 text-sm">
+            <tr>
+              <td colspan="6" class="py-12 text-center text-slate-500 text-sm">
+                No products in catalog yet. Start a scraping run above to populate items.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- E. Proxy Manager Modal (<dialog>) -->
+  <dialog
+    id="proxyModal"
+    closedby="any"
+    aria-labelledby="proxyModalTitle"
+    class="w-full max-w-2xl rounded-2xl bg-slate-900 text-slate-100 border border-slate-700 shadow-2xl p-0 overflow-hidden"
+  >
+    <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="shield" class="w-5 h-5 text-indigo-400"></i>
+        <h3 id="proxyModalTitle" class="text-base font-semibold text-white">Proxy Manager</h3>
+      </div>
+      <button
+        type="button"
+        onclick="closeProxyModal()"
+        class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+        aria-label="Close Proxy Manager"
+      >
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <div class="p-5 space-y-5">
+      <!-- Add Proxy Form -->
+      <form id="addProxyForm" onsubmit="handleAddProxy(event)" class="space-y-3 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
+        <label for="newProxyInput" class="block text-xs font-medium text-slate-300">
+          Add Proxy Server (<code class="text-indigo-300">host:port</code>, <code class="text-indigo-300">host:port:user:pass</code>, <code class="text-indigo-300">http://...</code>, <code class="text-indigo-300">socks5://...</code>)
+        </label>
+        <div class="flex flex-col sm:flex-row gap-2.5">
+          <input
+            id="newProxyInput"
+            type="text"
+            required
+            placeholder="e.g. 192.168.1.10:8080:myuser:mypass or socks5://10.0.0.1:1080"
+            class="flex-1 rounded-xl bg-slate-900 border border-slate-700 focus:border-indigo-500 px-3.5 py-2 text-sm text-white placeholder-slate-500 outline-none"
+          />
+          <button
+            id="addProxySubmitBtn"
+            type="submit"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition"
+          >
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add Proxy</span>
+          </button>
+        </div>
+        <div class="flex items-center justify-between pt-1">
+          <label class="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <input id="checkProxyImmediateCheckbox" type="checkbox" checked class="rounded bg-slate-900 border-slate-700 text-indigo-600 focus:ring-indigo-500" />
+            <span>Test connectivity immediately</span>
+          </label>
+          <span id="proxyFormError" class="text-xs text-rose-400"></span>
+        </div>
+      </form>
+
+      <!-- Proxies List -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">Saved Proxy Servers</h4>
+        <div id="proxiesListContainer" class="space-y-2 max-h-72 overflow-y-auto pr-1">
+          <p class="text-xs text-slate-500 py-4 text-center">No proxies configured yet.</p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    // Register Service Worker for PWA
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      });
+    }
+
+    // Fallback light-dismiss for browsers without <dialog closedby="any"> support
+    const proxyDialog = document.getElementById("proxyModal");
+    if (proxyDialog && !("closedBy" in HTMLDialogElement.prototype)) {
+      proxyDialog.addEventListener("click", (event) => {
+        if (event.target !== proxyDialog) return;
+        const rect = proxyDialog.getBoundingClientRect();
+        const isDialogContent =
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width;
+        if (!isDialogContent) {
+          proxyDialog.close();
+        }
+      });
+    }
+
+    let lastSeenItemsScraped = -1;
+    let lastKnownRunningState = false;
+    let searchDebounceTimer = null;
+
+    function formatDuration(seconds) {
+      if (seconds === null || seconds === undefined || isNaN(seconds) || seconds < 0) {
+        return "00:00";
+      }
+      const totalSec = Math.round(Number(seconds));
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function setPreset(query) {
+      const input = document.getElementById("targetInput");
+      if (input) {
+        input.value = query;
+        input.focus();
+      }
+    }
+
+    function showErrorBanner(msg) {
+      const banner = document.getElementById("errorBanner");
+      const textEl = document.getElementById("errorBannerMessage");
+      if (banner && textEl && msg) {
+        textEl.textContent = msg;
+        banner.classList.remove("hidden");
+      }
+    }
+
+    function dismissErrorBanner() {
+      const banner = document.getElementById("errorBanner");
+      if (banner) {
+        banner.classList.add("hidden");
+      }
+    }
+
+    function openProxyModal() {
+      if (proxyDialog) {
+        loadProxies();
+        proxyDialog.showModal();
+      }
+    }
+
+    function closeProxyModal() {
+      if (proxyDialog) {
+        proxyDialog.close();
+      }
+    }
+
+    async function handleStartScraping(event) {
+      event.preventDefault();
+      dismissErrorBanner();
+
+      const target = document.getElementById("targetInput").value.trim();
+      const maxPages = parseInt(document.getElementById("maxPagesInput").value, 10) || 1;
+      const delaySeconds = parseFloat(document.getElementById("delayInput").value) || 0;
+      const proxyIdVal = document.getElementById("proxySelect").value;
+      const proxyId = proxyIdVal ? parseInt(proxyIdVal, 10) : null;
+
+      try {
+        const res = await fetch("/api/parser/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target,
+            max_pages: maxPages,
+            proxy_id: proxyId,
+            delay_seconds: delaySeconds,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          showErrorBanner(data.detail || "Failed to start scraping task.");
+          return;
+        }
+
+        lastSeenItemsScraped = 0;
+        updateTelemetryUI(data);
+        await loadTasksHistory();
+      } catch (err) {
+        showErrorBanner("Network error while starting scraper: " + err.message);
+      }
+    }
+
+    async function handleStopScraping() {
+      try {
+        const res = await fetch("/api/parser/stop", { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+          updateTelemetryUI(data);
+          await loadProducts();
+          await loadTasksHistory();
+        }
+      } catch (err) {
+        showErrorBanner("Failed to stop parser: " + err.message);
+      }
+    }
+
+    function updateTelemetryUI(statusData) {
+      const status = (statusData.status || "idle").toLowerCase();
+      const isRunning = Boolean(statusData.is_running);
+
+      // Update Header Pill
+      const pill = document.getElementById("headerStatusPill");
+      const dot = document.getElementById("headerStatusDot");
+      const text = document.getElementById("headerStatusText");
+      text.textContent = status.toUpperCase();
+
+      const pillStyles = {
+        idle: ["bg-slate-800 text-slate-300 border-slate-700", "bg-slate-400"],
+        running: ["bg-indigo-950 text-indigo-300 border-indigo-700", "bg-indigo-400 animate-ping"],
+        stopping: ["bg-amber-950 text-amber-300 border-amber-700", "bg-amber-400 animate-pulse"],
+        completed: ["bg-emerald-950 text-emerald-300 border-emerald-700", "bg-emerald-400"],
+        stopped: ["bg-amber-950 text-amber-300 border-amber-700", "bg-amber-400"],
+        error: ["bg-rose-950 text-rose-300 border-rose-700", "bg-rose-400"],
+      };
+      const [pillCls, dotCls] = pillStyles[status] || pillStyles.idle;
+      pill.className = `inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider border ${pillCls}`;
+      dot.className = `w-2 h-2 rounded-full ${dotCls}`;
+
+      // Buttons state
+      const startBtn = document.getElementById("startScrapingBtn");
+      const stopBtn = document.getElementById("stopScrapingBtn");
+      const spinner = document.getElementById("startBtnSpinner");
+      const startText = document.getElementById("startBtnText");
+
+      startBtn.disabled = isRunning;
+      stopBtn.disabled = !isRunning;
+
+      if (isRunning) {
+        spinner.classList.remove("hidden");
+        startText.textContent = status === "stopping" ? "Stopping..." : "Scraping in Progress...";
+      } else {
+        spinner.classList.add("hidden");
+        startText.textContent = "Start Scraping";
+      }
+
+      // Progress bar
+      const pct = Number(statusData.progress_percent || 0);
+      const completedPages = Number(statusData.completed_pages || 0);
+      const maxPages = Number(statusData.max_pages || 0);
+      const currentPage = Number(statusData.current_page || 0);
+
+      const pageDisplay = isRunning ? Math.max(currentPage, completedPages) : completedPages;
+      document.getElementById("progressPageLabel").textContent = `Page ${pageDisplay} of ${maxPages} (${pct.toFixed(1)}%)`;
+      document.getElementById("progressTargetLabel").textContent = statusData.target ? `Target: ${statusData.target}` : "Ready";
+      document.getElementById("telemetryTaskBadge").textContent = statusData.task_id ? `Task #${statusData.task_id}` : "No active run";
+
+      const barFill = document.getElementById("progressBarFill");
+      barFill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+      if (isRunning) {
+        barFill.classList.add("progress-striped");
+      } else {
+        barFill.classList.remove("progress-striped");
+      }
+
+      // Metrics
+      document.getElementById("metricElapsed").textContent = formatDuration(statusData.elapsed_seconds);
+
+      const etaEl = document.getElementById("metricEta");
+      if (isRunning && statusData.estimated_remaining_seconds !== null && statusData.estimated_remaining_seconds !== undefined) {
+        etaEl.textContent = `~${formatDuration(statusData.estimated_remaining_seconds)} remaining`;
+      } else {
+        etaEl.textContent = "—";
+      }
+
+      document.getElementById("metricItemsCount").textContent = String(statusData.items_scraped || 0);
+      document.getElementById("metricSpeed").innerHTML = `${Number(statusData.items_per_second || 0).toFixed(2)} <span class="text-xs font-normal text-slate-400">items/sec</span>`;
+      document.getElementById("lastUpdatedTime").textContent = `Synced: ${new Date().toLocaleTimeString()}`;
+
+      if (status === "error" && statusData.error_message) {
+        showErrorBanner(statusData.error_message);
+      }
+
+      // Auto-refresh products table when new items arrive or when run finishes
+      const currentScraped = Number(statusData.items_scraped || 0);
+      if (currentScraped !== lastSeenItemsScraped && lastSeenItemsScraped !== -1) {
+        lastSeenItemsScraped = currentScraped;
+        loadProducts();
+        loadTasksHistory();
+      } else if (lastSeenItemsScraped === -1) {
+        lastSeenItemsScraped = currentScraped;
+      }
+
+      if (lastKnownRunningState && !isRunning) {
+        loadProducts();
+        loadTasksHistory();
+      }
+      lastKnownRunningState = isRunning;
+    }
+
+    async function pollStatus() {
+      try {
+        const res = await fetch("/api/parser/status");
+        if (res.ok) {
+          const data = await res.json();
+          updateTelemetryUI(data);
+        }
+      } catch (_) {}
+    }
+
+    async function loadProducts() {
+      const search = document.getElementById("productSearchInput").value.trim();
+      const taskId = document.getElementById("taskFilterSelect").value;
+      const params = new URLSearchParams({ limit: "200" });
+      if (search) params.set("search", search);
+      if (taskId) params.set("task_id", taskId);
+
+      try {
+        const res = await fetch(`/api/products?${params.toString()}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById("totalProductsBadge").textContent = `Total Products: ${data.total}`;
+        const tbody = document.getElementById("productsTableBody");
+
+        if (!data.items || data.items.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="py-12 text-center text-slate-500 text-sm">
+                No matching products found. Start a scraping run or adjust your search filter.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = data.items
+          .map((item) => {
+            const imgHtml = item.image_url
+              ? `<img src="${escapeHtml(item.image_url)}" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" class="w-12 h-12 rounded-lg object-cover bg-slate-800 border border-slate-700 shrink-0" /><div style="display:none" class="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 items-center justify-center text-slate-500 shrink-0 text-xs">IMG</div>`
+              : `<div class="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 shrink-0 text-xs">IMG</div>`;
+
+            const origPriceHtml =
+              item.original_price && item.original_price > item.price
+                ? `<span class="block text-xs text-slate-500 line-through">${escapeHtml(item.currency)} ${Number(item.original_price).toFixed(2)}</span>`
+                : "";
+
+            const ratingHtml =
+              item.rating !== null && item.rating !== undefined
+                ? `<span class="inline-flex items-center gap-1 text-amber-400 font-semibold text-xs">★ ${Number(item.rating).toFixed(1)}</span>`
+                : `<span class="text-xs text-slate-500">No rating</span>`;
+
+            const ordersHtml = item.orders_count
+              ? `<span class="inline-block px-2 py-0.5 rounded-md text-[11px] bg-slate-800 text-slate-300 border border-slate-700">${escapeHtml(item.orders_count)}</span>`
+              : "";
+
+            const scrapedDate = item.scraped_at
+              ? new Date(item.scraped_at).toLocaleString()
+              : "—";
+
+            return `
+              <tr class="hover:bg-slate-800/40 transition-colors">
+                <td class="py-3 px-4 max-w-md">
+                  <div class="flex items-start gap-3">
+                    ${imgHtml}
+                    <div class="min-w-0">
+                      <a href="${escapeHtml(item.product_url)}" target="_blank" rel="noopener noreferrer" class="font-medium text-slate-100 hover:text-indigo-400 line-clamp-2 transition-colors">
+                        ${escapeHtml(item.title)}
+                      </a>
+                      <div class="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-slate-400">
+                        <span class="font-mono">ID: ${escapeHtml(item.item_id)}</span>
+                        ${item.category_or_query ? `<span class="px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 border border-slate-700">${escapeHtml(item.category_or_query)}</span>` : ""}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <span class="font-bold text-emerald-400">${escapeHtml(item.currency)} ${Number(item.price).toFixed(2)}</span>
+                  ${origPriceHtml}
+                </td>
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <div class="flex flex-col items-start gap-1">
+                    ${ratingHtml}
+                    ${ordersHtml}
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-xs text-slate-300 max-w-[160px] truncate">
+                  ${escapeHtml(item.store_name || "—")}
+                </td>
+                <td class="py-3 px-4 text-xs text-slate-400 whitespace-nowrap">
+                  ${escapeHtml(scrapedDate)}
+                </td>
+                <td class="py-3 px-4 text-right whitespace-nowrap">
+                  <a
+                    href="${escapeHtml(item.product_url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 transition-colors"
+                  >
+                    <span>View Item ↗</span>
+                  </a>
+                </td>
+              </tr>
+            `;
+          })
+          .join("");
+      } catch (_) {}
+    }
+
+    function handleSearchDebounce() {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = setTimeout(() => {
+        loadProducts();
+      }, 300);
+    }
+
+    async function loadTasksHistory() {
+      try {
+        const res = await fetch("/api/parser/tasks");
+        if (!res.ok) return;
+        const tasks = await res.json();
+        const selectEl = document.getElementById("taskFilterSelect");
+        const currentVal = selectEl.value;
+
+        selectEl.innerHTML =
+          `<option value="">All Scraping Runs</option>` +
+          tasks
+            .map(
+              (t) =>
+                `<option value="${t.id}">#${t.id} - ${escapeHtml(t.target)} (${t.items_scraped} items, ${t.status})</option>`
+            )
+            .join("");
+
+        if (currentVal) {
+          selectEl.value = currentVal;
+        }
+      } catch (_) {}
+    }
+
+    async function handleClearProducts() {
+      const taskId = document.getElementById("taskFilterSelect").value;
+      const msg = taskId
+        ? `Delete all products from scraping run #${taskId}?`
+        : "Are you sure you want to delete ALL scraped products from the catalog?";
+      if (!confirm(msg)) return;
+
+      const url = taskId ? `/api/products?task_id=${encodeURIComponent(taskId)}` : "/api/products";
+      try {
+        const res = await fetch(url, { method: "DELETE" });
+        if (res.ok) {
+          await loadProducts();
+        }
+      } catch (err) {
+        showErrorBanner("Failed to clear products: " + err.message);
+      }
+    }
+
+    function exportExcel() {
+      const search = document.getElementById("productSearchInput").value.trim();
+      const taskId = document.getElementById("taskFilterSelect").value;
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (taskId) params.set("task_id", taskId);
+
+      const queryStr = params.toString();
+      window.location.href = queryStr ? `/api/products/export?${queryStr}` : "/api/products/export";
+    }
+
+    async function loadProxies() {
+      try {
+        const res = await fetch("/api/proxies");
+        if (!res.ok) return;
+        const proxies = await res.json();
+
+        document.getElementById("proxiesCountBtnText").textContent = `Proxies (${proxies.length})`;
+
+        // Populate main proxy selector
+        const selectEl = document.getElementById("proxySelect");
+        const prevSelected = selectEl.value;
+        selectEl.innerHTML =
+          `<option value="">Direct Connection (No Proxy)</option>` +
+          proxies
+            .map((p) => {
+              const statusTag =
+                p.is_working === true
+                  ? `[OK ${p.latency_ms || 0}ms]`
+                  : p.is_working === false
+                  ? `[OFFLINE]`
+                  : `[UNTESTED]`;
+              return `<option value="${p.id}">${escapeHtml(p.protocol)}://${escapeHtml(p.host)}:${p.port} ${statusTag}</option>`;
+            })
+            .join("");
+        if (prevSelected) selectEl.value = prevSelected;
+
+        // Populate modal list
+        const listContainer = document.getElementById("proxiesListContainer");
+        if (proxies.length === 0) {
+          listContainer.innerHTML = `<p class="text-xs text-slate-500 py-4 text-center">No proxies configured yet.</p>`;
+          return;
+        }
+
+        listContainer.innerHTML = proxies
+          .map((p) => {
+            let badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">Untested</span>`;
+            if (p.is_working === true) {
+              badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-950 text-emerald-300 border border-emerald-700/70">Online (${p.latency_ms ?? 0} ms)</span>`;
+            } else if (p.is_working === false) {
+              badgeHtml = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-rose-950 text-rose-300 border border-rose-700/70">Offline</span>`;
+            }
+
+            const authLabel = p.username ? `<span class="text-[11px] text-indigo-300">Auth: ${escapeHtml(p.username)}</span>` : `<span class="text-[11px] text-slate-500">No Auth</span>`;
+
+            return `
+              <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-indigo-950 text-indigo-300 border border-indigo-800">${escapeHtml(p.protocol)}</span>
+                    <span class="font-mono text-xs text-white truncate">${escapeHtml(p.host)}:${p.port}</span>
+                    ${badgeHtml}
+                  </div>
+                  <div class="mt-1 flex items-center gap-3">
+                    ${authLabel}
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    id="checkProxyBtn-${p.id}"
+                    onclick="handleCheckProxy(${p.id})"
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                  >
+                    Check
+                  </button>
+                  <button
+                    type="button"
+                    onclick="handleDeleteProxy(${p.id})"
+                    class="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/60 transition"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      } catch (_) {}
+    }
+
+    async function handleAddProxy(event) {
+      event.preventDefault();
+      const inputEl = document.getElementById("newProxyInput");
+      const checkImmediate = document.getElementById("checkProxyImmediateCheckbox").checked;
+      const errEl = document.getElementById("proxyFormError");
+      const btn = document.getElementById("addProxySubmitBtn");
+
+      errEl.textContent = "";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch("/api/proxies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            raw_proxy: inputEl.value.trim(),
+            check_connectivity: checkImmediate,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errEl.textContent = data.detail || "Invalid proxy format";
+          return;
+        }
+        inputEl.value = "";
+        await loadProxies();
+      } catch (err) {
+        errEl.textContent = "Error: " + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleCheckProxy(proxyId) {
+      const btn = document.getElementById(`checkProxyBtn-${proxyId}`);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Checking...";
+      }
+      try {
+        await fetch(`/api/proxies/${proxyId}/check`, { method: "POST" });
+        await loadProxies();
+      } catch (_) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Check";
+        }
+      }
+    }
+
+    async function handleDeleteProxy(proxyId) {
+      try {
+        const res = await fetch(`/api/proxies/${proxyId}`, { method: "DELETE" });
+        if (res.ok) {
+          await loadProxies();
+        }
+      } catch (_) {}
+    }
+
+    async function refreshAllData() {
+      await Promise.all([pollStatus(), loadProducts(), loadTasksHistory(), loadProxies()]);
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+      refreshAllData();
+      setInterval(pollStatus, 1000);
+    });
+  </script>
+</body>
+</html>

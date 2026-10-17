@@ -1,10 +1,13 @@
 """FastAPI REST application for AliExpress Scraper, Product catalog, Excel export, and Proxy management."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -250,3 +253,38 @@ def delete_proxy(
     db.delete(proxy_obj)
     db.commit()
     return {"deleted": True, "id": proxy_id}
+
+
+# =============================================================================
+# D. Static Files & PWA Frontend Routes
+# =============================================================================
+
+STATIC_DIR = Path(__file__).resolve().parent.parent / "web" / "static"
+
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def serve_pwa_index() -> FileResponse:
+    """Serve the main English PWA dashboard HTML."""
+    return FileResponse(STATIC_DIR / "index.html", media_type="text/html")
+
+
+@app.get("/manifest.json", include_in_schema=False)
+def serve_pwa_manifest() -> FileResponse:
+    """Serve the PWA Web App Manifest."""
+    return FileResponse(STATIC_DIR / "manifest.json", media_type="application/manifest+json")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def serve_pwa_service_worker() -> FileResponse:
+    """Serve the PWA Service Worker script."""
+    return FileResponse(STATIC_DIR / "sw.js", media_type="application/javascript")
+
+
+@app.get("/icon.svg", include_in_schema=False)
+def serve_pwa_icon() -> FileResponse:
+    """Serve the vector SVG app icon."""
+    return FileResponse(STATIC_DIR / "icon.svg", media_type="image/svg+xml")
+
