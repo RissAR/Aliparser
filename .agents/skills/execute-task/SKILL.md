@@ -1,6 +1,6 @@
 ---
 name: execute-task
-description: Executes tasks specified in .agents/current_task.md with strict scope discipline and verification.
+description: Executes tasks specified in .agents/current_task.md with strict scope discipline, verification, and automatic git commit + push.
 ---
 
 # Execute Task Skill
@@ -14,9 +14,10 @@ Use this skill to implement instructions formulated in `.agents/current_task.md`
    - Do not refactor unrelated code.
    - Do not add unrequested third-party dependencies or mock services.
 3. **Verification:**
-   - Run tests, type checks, or linter if applicable.
+   - Run tests, type checks, or verification commands specified in `.agents/current_task.md`.
    - Ensure changes run without syntax errors or runtime exceptions.
-4. **Report & Git Commit Command:**
-   - Summarize modified files and actions taken.
-   - Provide the single one-liner git command:
-     `git add . && git commit -m "..." && git push origin main`
+4. **Automatic Git Commit & Push:**
+   - Automatically execute the git commit and push command specified in `.agents/current_task.md` via terminal (`git add . && git commit -m "..." && git push origin main`).
+   - Verify that `git status` is clean and changes are pushed to `origin/main`.
+5. **Report:**
+   - Summarize modified files, verification logs, and confirm the commit hash pushed to GitHub.

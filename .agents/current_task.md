@@ -1,104 +1,156 @@
-# ТЗ №1: Ізольований прототип ядра парсингу AliExpress (Playwright Stealth & Data Extraction)
+# ТЗ №2: Структура бази даних (SQLite + SQLAlchemy) та Менеджер Проксі (DB & Proxy Manager)
 
 ## Мета
-Створити швидке, захищене від блокувань та універсальне ядро парсингу для платформи AliExpress:
-1. Забезпечити підтримку як текстових пошукових запитів (будь-які товари/ключові слова), так і прямих посилань на категорії каталогу AliExpress.
-2. Реалізувати маскування браузера Playwright (stealth-налаштування) для мінімізації ризику блокувань та слайдер-капчі.
-3. Оптимізувати швидкість завантаження через перехоплення та блокування важких статичних ресурсів (медіа, відео, шрифти, аналітика).
-4. Реалізувати вилучення структурованих даних товару (через перехоплення внутрішніх JSON відповідей сторінки та резервний селекторний парсинг).
-5. Забезпечити можливість підключення проксі (HTTP / SOCKS5 з авторизацією та без).
-6. Створити автономний CLI-скрипт тестування для верифікації роботи ядра.
+Створити шар збереження даних (SQLite + SQLAlchemy) та модуль керування проксі-серверами:
+1. Реалізувати моделі бази даних: `Product` (зібрані товари з захистом від дублікатів), `ParsingTask` (історія та стан запусків парсера), `Proxy` (список проксі та їхній статус).
+2. Реалізувати логіку `upsert_products` для збереження та оновлення товарів за унікальним `item_id` без дублювання записів.
+3. Створити модуль `proxy_manager.py`, який розпізнає різні формати проксі (`ip:port`, `ip:port:user:pass`, `http://...`, `socks5://...`), конвертує їх у формат для Playwright та асинхронно перевіряє їхню працездатність і пінг (`latency_ms`).
+4. Написати та запустити верифікаційний скрипт `scripts/test_db_and_proxy.py`.
+5. Виконати автоматичний git commit та git push у репозиторій GitHub.
 
 ---
 
 ## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/Aliparser/
-├── requirements.txt                   # Мінімальні необхідні бібліотеки (playwright, pydantic)
+├── requirements.txt                   # Додати sqlalchemy>=2.0.0 та httpx[socks]>=0.27.0
 ├── src/
-│   ├── __init__.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── models.py                  # Моделі SQLAlchemy: Product, ParsingTask, Proxy
+│   │   └── database.py                # Ініціалізація SQLite, сесії та функція upsert_products
 │   └── parser/
-│       ├── __init__.py
-│       └── aliexpress.py              # Асинхронний клас AliExpressScraper
+│       └── proxy_manager.py           # Парсинг рядків проксі, конвертація для Playwright, перевірка пінгу
 └── scripts/
-    └── test_scraper.py                # Скрипт перевірки збору товарів з виводом звіту в консоль
+    └── test_db_and_proxy.py           # Автономний тест БД, upsert-логіки та парсингу проксі
 ```
 
 ---
 
 ## Детальні вимоги до реалізації
 
-### 1. Залежності `requirements.txt`
-* `playwright>=1.40.0`
-* `pydantic>=2.0.0`
+### 1. Оновлення `requirements.txt`
+Зберегти існуючі залежності та додати:
+* `sqlalchemy>=2.0.0`
+* `httpx[socks]>=0.27.0`
 
 ---
 
-### 2. Структура даних `src/parser/aliexpress.py`
-Створити Pydantic-модель товару `AliProductItem`:
-* `item_id`: `str` — унікальний цифровий ID товару на AliExpress.
-* `title`: `str` — назва товару.
-* `price`: `float` — актуальна ціна продажу.
-* `original_price`: `Optional[float]` — ціна до знижки (якщо присутня).
-* `currency`: `str` — валюта (наприклад, `USD`, `UAH`, `EUR`).
-* `rating`: `Optional[float]` — середній рейтинг товару (наприклад, 4.8).
-* `orders_count`: `Optional[str]` — кількість замовлень/продажів (наприклад, "500+ sold").
-* `store_name`: `Optional[str]` — назва магазину/продавця.
-* `product_url`: `str` — повне пряме посилання на товар (очищене від зайвих трекінг-параметрів).
-* `image_url`: `str` — посилання на головне зображення/прев'ю.
+### 2. Моделі бази даних `src/db/models.py`
+Використовувати `DeclarativeBase` із SQLAlchemy 2.0:
+
+1. **Модель `Proxy` (таблиця `proxies`):**
+   * `id`: ` int` (Primary Key, autoincrement)
+   * `raw_proxy`: `str` (Unique, nullable=False) — початковий рядок або канонічний ключ `protocol://host:port:user`
+   * `protocol`: `str` (default `"http"`) — `http`, `https`, `socks5`
+   * `host`: `str` (nullable=False)
+   * `port`: `int` (nullable=False)
+   * `username`: `Optional[str]` (nullable=True)
+   * `password`: `Optional[str]` (nullable=True)
+   * `is_active`: `bool` (default `True`)
+   * `is_working`: `Optional[bool]` (nullable=True — `None` якщо ще не перевірено, `True` / `False` після перевірки)
+   * `latency_ms`: `Optional[int]` (nullable=True — пінг у мс)
+   * `last_checked_at`: `Optional[datetime]` (nullable=True)
+   * `created_at`: `datetime` (default UTC now)
+
+2. **Модель `ParsingTask` (таблиця `parsing_tasks`):**
+   * `id`: `int` (Primary Key, autoincrement)
+   * `target`: `str` (nullable=False) — URL категорії або пошуковий запит
+   * `max_pages`: `int` (default `1`)
+   * `current_page`: `int` (default `0`)
+   * `status`: `str` (default `"idle"`) — можливі стани: `idle`, `running`, `completed`, `stopped`, `error`
+   * `items_scraped`: `int` (default `0`)
+   * `proxy_id`: `Optional[int]` (ForeignKey `"proxies.id"`, nullable=True)
+   * `error_message`: `Optional[str]` (Text, nullable=True)
+   * `started_at`: `Optional[datetime]` (nullable=True)
+   * `finished_at`: `Optional[datetime]` (nullable=True)
+   * `created_at`: `datetime` (default UTC now)
+
+3. **Модель `Product` (таблиця `products`):**
+   * `id`: `int` (Primary Key, autoincrement)
+   * `item_id`: `str` (Unique, Index, nullable=False) — ID товару на AliExpress
+   * `title`: `str` (nullable=False)
+   * `price`: `float` (nullable=False)
+   * `original_price`: `Optional[float]` (nullable=True)
+   * `currency`: `str` (default `"USD"`)
+   * `rating`: `Optional[float]` (nullable=True)
+   * `orders_count`: `Optional[str]` (nullable=True)
+   * `store_name`: `Optional[str]` (nullable=True)
+   * `product_url`: `str` (nullable=False)
+   * `image_url`: `Optional[str]` (nullable=True)
+   * `category_or_query`: `Optional[str]` (nullable=True) — запит або URL, за яким знайдено товар
+   * `task_id`: `Optional[int]` (ForeignKey `"parsing_tasks.id"`, nullable=True)
+   * `scraped_at`: `datetime` (default UTC now, оновлюється при повторному парсингу)
 
 ---
 
-### 3. Логіка ядра `AliExpressScraper` (`src/parser/aliexpress.py`)
-Клас повинен мати методи:
-* `__init__(self, proxy: Optional[dict] = None, headless: bool = True)`
-  * Приймає конфігурацію проксі у форматі Playwright:
-    `{"server": "http://ip:port", "username": "...", "password": "..."}` або `None`.
-* `async def start(self)` / `async def close(self)` (або `async with` контекстний менеджер) для ініціалізації та коректного закриття Playwright та браузера.
-* **Налаштування Stealth & Оптимізація:**
-  * Додати аргументи запуску: `--disable-blink-features=AutomationControlled`, реалістичний `user_agent`, `viewport={"width": 1440, "height": 900}`, налаштування локалі (`en-US`).
-  * Додати перехоплення запитів (`route`): блокувати типи `image`, `media`, `font` для оптимізації швидкості в 3–5 разів під час збору каталогу (посилання на фото береться з HTML/JSON даних, фізично вантажити байти картинки браузеру не потрібно).
-* `async def scrape_page(self, target: str, page_number: int = 1) -> List[AliProductItem]`:
-  * Параметр `target`: якщо починається з `http://` або `https://` — використовувати як прямий URL категорії/каталогу; якщо це текст — формувати пошуковий URL (наприклад: `https://www.aliexpress.com/w/wholesale-{query}.html?page={page_number}`).
-  * Зчитувати товари: через інспекцію скриптів з вбудованими даними сторінки (`runParams`, `_init_data_`) або з DOM-карток результатів пошуку.
-  * Фільтрувати порожні або некоректні елементи.
+### 3. Підключення та операції БД `src/db/database.py`
+* База даних зберігається за шляхом `data/aliparser.db` (автоматично створювати папку `data/`, якщо її немає).
+* `engine = create_engine("sqlite:///data/aliparser.db", connect_args={"check_same_thread": False})`.
+* `SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)`.
+* Функція `init_db() -> None`: створює таблиці (`Base.metadata.create_all(bind=engine)`).
+* Генератор `get_db()`: повертає сесію та закриває її в блоці `finally`.
+* Функція `upsert_products(db: Session, items: List[AliProductItem], category_or_query: Optional[str] = None, task_id: Optional[int] = None) -> int`:
+  * Для кожного `AliProductItem`: якщо запис з таким `item_id` вже є в таблиці `products` — оновлює `title`, `price`, `original_price`, `currency`, `rating`, `orders_count`, `store_name`, `product_url`, `image_url`, `category_or_query`, `task_id`, `scraped_at`. Якщо немає — додає новий `Product`.
+  * Виконує `db.commit()` та повертає кількість оброблених товарів.
 
 ---
 
-### 4. Автономний скрипт верифікації `scripts/test_scraper.py`
-* Підтримує аргументи командного рядка:
-  * `--query` (за замовчуванням: `"wireless mouse"` або пряме посилання на категорію).
-  * `--pages` (кількість сторінок, за замовчуванням 1).
-  * `--proxy` (опціональний рядок проксі для тесту).
-  * `--headful` (опціональний прапорець для запуску з видимим вікном браузера при відлагодженні).
-* Запускає скрапер, виводить час виконання збору сторінки та друкує в консоль таблицю перших 10 товарів:
-  `[ID] | [Ціна] | [Рейтинг] | [Замовлень] | [Назва] | [URL]`.
-* Зберігає повний результат збору в тимчасовий тестовий файл `test_results.json` для інспекції повноти полів.
+### 4. Менеджер Проксі `src/parser/proxy_manager.py`
+* Функція `parse_proxy_string(raw_proxy: str) -> dict`:
+  * Приймає рядок проксі у будь-якому з популярних форматів:
+    1. `host:port` (за замовчуванням `http`)
+    2. `host:port:username:password` (за замовчуванням `http`)
+    3. `protocol://host:port` (`http`, `https`, `socks5`)
+    4. `protocol://username:password@host:port`
+  * Повертає словник: `{"raw_proxy": ..., "protocol": ..., "host": ..., "port": int, "username": ..., "password": ...}`.
+  * Якщо формат некоректний — викидає `ValueError` зі зрозумілим описом.
+* Функція `to_playwright_proxy(proxy_data: Union[Proxy, dict]) -> dict`:
+  * Повертає словник для Playwright:
+    `{"server": f"{protocol}://{host}:{port}"}` (+ `"username"` та `"password"`, якщо вони задані).
+* Функція `to_httpx_proxy_url(proxy_data: Union[Proxy, dict]) -> str`:
+  * Формує URL рядка підключення для `httpx`: `protocol://[user:pass@]host:port`.
+* Асинхронна функція `check_proxy_connectivity(proxy_data: Union[Proxy, dict], timeout: float = 10.0) -> tuple[bool, Optional[int], Optional[str]]`:
+  * Виконує тестовий GET-запит через `httpx.AsyncClient(proxy=proxy_url, timeout=timeout)` до `https://api.ipify.org?format=json` (або `https://www.aliexpress.com`).
+  * Вимірює час відповіді у мілісекундах (`latency_ms`).
+  * Повертає кортеж: `(is_working: bool, latency_ms: Optional[int], error_message: Optional[str])`.
+
+---
+
+### 5. Верифікаційний скрипт `scripts/test_db_and_proxy.py`
+Скрипт повинен послідовно перевірити:
+1. Ініціалізацію БД (`init_db()`).
+2. Парсинг усіх 4 форматів проксі (`1.2.3.4:8080`, `1.2.3.4:8080:user1:pass1`, `socks5://5.6.7.8:1080`, `http://admin:secret@9.10.11.12:3128`) та конвертацію у Playwright-формат.
+3. Збереження проксі та задачі `ParsingTask` у БД.
+4. Роботу `upsert_products`:
+   * Додавання 2 тестових `AliProductItem`.
+   * Повторний виклик `upsert_products` з тим самим `item_id`, але новою ціною (перевірка, що кількість записів у БД не продублювалася, а ціна оновилася).
+5. Виведення чіткого звіту `ALL DB & PROXY TESTS PASSED` у консоль.
 
 ---
 
 ## Критерії приймання та верифікація (Verification)
-1. **Створення віртуального оточення та встановлення залежностей:**
+1. **Встановлення нових залежностей:**
    ```bash
-   python3 -m venv venv
    venv/bin/pip install -r requirements.txt
-   venv/bin/playwright install chromium
    ```
-2. **Запуск тестування збору за пошуковим словом:**
+2. **Запуск тесту БД та проксі-менеджера:**
    ```bash
-   venv/bin/python scripts/test_scraper.py --query "smart watch" --pages 1
+   venv/bin/python scripts/test_db_and_proxy.py
    ```
-   *Очікуваний результат:* знайдено від 20 до 60 товарів, у консоль виведено таблицю з валідними назвами, цінами та посиланнями.
-3. **Запуск тестування збору за прямою категорією:**
-   ```bash
-   venv/bin/python scripts/test_scraper.py --query "https://www.aliexpress.com/category/200003482/computer-components.html" --pages 1
-   ```
-   *Очікуваний результат:* ядро коректно розпізнає URL та збирає товари з категорії.
+   *Очікуваний результат:* скрипт проходить усі перевірки без помилок і виводить `ALL DB & PROXY TESTS PASSED`.
+
+---
+
+## Обов'язковий фінальний крок (Автоматичний Git Commit & Push)
+Після успішного проходження верифікації агент у Чаті 2 **ЗОБОВ'ЯЗАНИЙ самостійно виконати** в терміналі команду фіксації та відправки змін на GitHub:
+```bash
+git add . && git commit -m "feat: add SQLite database models, product upsert logic, and proxy manager" && git push origin main
+```
 
 ---
 
 ## Формат звіту після виконання (у Чат 2)
-1. Список створених файлів.
-2. Лог виконання тестового скрипта зі зразком 3–5 зібраних товарів.
-3. Єдина команда для git фіксації:
-   `git add . && git commit -m "feat: implement AliExpress Playwright scraper core with stealth and test runner" && git push origin main`
+1. Список створених та модифікованих файлів.
+2. Лог виконання `scripts/test_db_and_proxy.py`.
+3. Підтвердження виконання `git commit` та `git push origin main` (із хешем коміту).
