@@ -9,12 +9,12 @@ Use this skill to implement instructions formulated in `.agents/current_task.md`
 
 ## Workflow:
 1. **Read Task Definition:** Open and read `.agents/current_task.md` to get the context, objectives, modified files, and implementation details.
-2. **Strict Scope Discipline (Zero Scope Creep):**
-   - Modify or create ONLY the files specified in the task.
+2. **Strict Scope & System Safety Discipline (Zero Scope Creep):**
+   - Modify or create ONLY the project files specified in the task inside `/home/dofi/Dev/Aliparser`.
+   - **STRICTLY FORBIDDEN:** Never run system package managers or privilege escalation commands (`sudo`, `pkexec`, `apt`, `apt-get`, `dpkg`, `snap`, `flatpak`) or install anything into the host OS. Only use project-local `venv/bin/python` and `venv/bin/pip`.
    - Do not refactor unrelated code.
-   - Do not add unrequested third-party dependencies or mock services.
 3. **Verification:**
-   - Run tests, type checks, or verification commands specified in `.agents/current_task.md`.
+   - Run tests, type checks, or verification commands specified in `.agents/current_task.md` using `venv/bin/python`.
    - Ensure changes run without syntax errors or runtime exceptions.
 4. **Automatic Git Commit & Push:**
    - Automatically execute the git commit and push command specified in `.agents/current_task.md` via terminal (`git add . && git commit -m "..." && git push origin main`).
