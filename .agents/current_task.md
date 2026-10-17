@@ -1,12 +1,15 @@
-# ТЗ №5: Англомовний PWA Веб-Інтерфейс (Progressive Web App Dashboard)
+# ТЗ №6: Виправлення збору фото, ремонт відкриття Excel (.xlsx), кастомні поля пагінації, очищення кнопок та Світла Тема (Light Theme UI)
 
 ## Мета
-Створити легкий, сучасний та повністю англомовний PWA-додаток (Progressive Web App), інтегрований із FastAPI бекендом, який дозволяє:
-1. Запускати та зупиняти парсер для будь-якої категорії або пошукового запиту AliExpress.
-2. Відстежувати живі індикатори роботи в реальному часі: поточний статус, анімований прогрес-бар, таймер витраченого часу (`Elapsed Time`), розрахунковий час до завершення (`ETA`), кількість зібраних товарів та швидкість збору.
-3. Керувати списком проксі-серверів (додавання, тестування пінгу/працездатності, видалення, вибір активного проксі для парсингу).
-4. Переглядати, шукати та фільтрувати зібрані товари прямо в таблиці з фотографіями, цінами, рейтингами та прямими клікабельними посиланнями на AliExpress.
-5. Вивантажувати зібрані товари в Excel (`.xlsx`) у 1 клік.
+Усунути всі зауваження після ручного тестування та перевести інтерфейс на чисту сучасну **Світлу Тему (Light Theme)**:
+1. **Виправити збір фотографій товарів (`src/parser/aliexpress.py`):** усунути потрапляння промо-бейджів (`Choice` `154x64.png`, `Brand+`, іконок зірочок) замість фото товару на перших позиціях; брати оригінальні фото продукту з внутрішнього JSON-стейту `_dida_config_._init_data_` та відфільтрованої галереї картки; очистити вже збережені в БД бейджі.
+2. **Виправити відкриття Excel-файлів (`.xlsx`):**
+   * Встановити в систему відсутній пакет табличного процесора `libreoffice-calc` (через `pkexec apt-get install -y libreoffice-calc`), щоб ОС відкривала `.xlsx` у Calc, а не у текстовому Writer.
+   * Оновити `src/services/exporter.py`: англомовні заголовки, очистка рядків від заборонених у XML керуючих символів, 8-значні ARGB-кольори (`FF...`), виправлення шляхів у `workbook.xml.rels` для 100% сумісності з Excel та LibreOffice Calc.
+   * На фронтенді (`index.html`) реалізувати скачування Excel через `fetch` $\rightarrow$ `Blob` замість `window.location.href`.
+3. **Замінити системні стрілочки полів `Max Pages` та `Page Delay`:** приховати старі браузерні спінери у стилі Windows XP за допомогою CSS і додати акуратні вбудовані кнопки **`−` / `+`**.
+4. **Прибрати емодзі-стрілочку з кнопки `View Item`:** замінити `View Item ↗` на чистий текст `View Item` без юнікод-емодзі.
+5. **Перевести весь інтерфейс на Світлу Тему (Light Theme):** білі картки (`bg-white`), світло-сірий фон сторінки (`bg-slate-50`), високий контраст тексту (`text-slate-900`), акуратні тіні та бордери (`border-slate-200`).
 
 ---
 
@@ -14,125 +17,151 @@
 ```text
 /home/dofi/Dev/Aliparser/
 ├── src/
-│   ├── api/
-│   │   └── app.py                     # Підключення статики та маршрутів PWA (/, /manifest.json, /sw.js, /icon.svg)
+│   ├── parser/
+│   │   └── aliexpress.py              # Вилучення чистих фото з _dida_config_._init_data_ + фільтрація бейджів
+│   ├── services/
+│   │   └── exporter.py                # Англомовні заголовки, XML-санітизація, суворий OOXML формат
 │   └── web/
 │       └── static/
-│           ├── index.html             # Головний англомовний інтерфейс (Tailwind CSS + Lucide Icons + JS)
-│           ├── manifest.json          # PWA Web App Manifest
-│           ├── sw.js                  # Service Worker для PWA
-│           └── icon.svg               # Векторна іконка додатка
+│           ├── index.html             # Світла тема, кастомні кнопки -/+, чиста кнопка View Item, Blob-експорт Excel
+│           └── manifest.json          # Оновлення theme_color / background_color під світлу тему
 └── scripts/
-    └── test_pwa.py                    # Автономний тест доступності PWA-маршрутів та ресурсів
+    ├── test_api_and_export.py         # Оновлення перевірки англомовних заголовків Excel
+    └── test_pwa.py                    # Перевірка світлої теми та відсутності емодзі-стрілки
 ```
 
 ---
 
 ## Детальні вимоги до реалізації
 
-### 1. Роздача статики та PWA маршрутів у `src/api/app.py`
-Додати в `src/api/app.py` (зберегти всі існуючі API-ендпоінти без змін):
-* Підключити `StaticFiles` для `/static` із папки `src/web/static`.
-* Додати маршрути (через `FileResponse`):
-  * `GET /` $\rightarrow$ `src/web/static/index.html`
-  * `GET /manifest.json` $\rightarrow$ `src/web/static/manifest.json` (`media_type="application/manifest+json"`)
-  * `GET /sw.js` $\rightarrow$ `src/web/static/sw.js` (`media_type="application/javascript"`)
-  * `GET /icon.svg` $\rightarrow$ `src/web/static/icon.svg` (`media_type="image/svg+xml"`)
+### 1. Виправлення парсингу фотографій `src/parser/aliexpress.py`
+У методі `scrape_page` (`page.evaluate`):
+1. **Вилучення з JSON-стейту сторінки (`window._dida_config_._init_data_`):**
+   * Зчитати масив `window._dida_config_?._init_data_?.data?.data?.root?.fields?.mods?.itemList?.content || []`.
+   * Побудувати мапу `jsonItemsById` за ключем `String(item.productId || item.redirectedId)` із полями:
+     * `img`: `item.image?.imgUrl || (item.images && item.images[0]?.imgUrl) || ""`
+     * `title`: `item.title?.displayTitle || ""`
+     * `salePrice`: `item.prices?.salePrice?.minPrice`
+     * `origPrice`: `item.prices?.originalPrice?.minPrice`
+     * `currency`: `item.prices?.salePrice?.currencyCode || "USD"`
+     * `rating`: `item.evaluation?.starRating`
+     * `trade`: `item.trade?.tradeDesc || ""`
+     * `store`: `item.store?.storeName || ""`
+2. **Селектори DOM-карток та фільтрація зображень:**
+   * Шукати картки за селектором `.search-card-item, [class*="search-card-item"], [class*="cards--card--"]` (не використовувати `[class*="multi--content--"]` як кореневий елемент картки, бо він не містить блоку фотографії).
+   * Написати допоміжну JS-функцію `isBadgeOrIconUrl(url, imgEl)`:
+     * Повертає `true` (тобто ігнорувати це зображення), якщо:
+       * `url` містить будь-який із підрядків: `154x64`, `110x42`, `48x48`, `60x60`, `702x72`, `116x64`, `S1887a285b60743859ac7bdbfca5e0896Z`, `Sb008eb53e92f463eb0a2c17c539df530h`, `S5efe9a37755e44cfa878e2e714900709h`, `Sca75952228bb4507ac311d1b43e10721q`, `S135d2af8d57840b28092ceba069bdb6c4`.
+       * `imgEl.className` або `imgEl.parentElement?.className` містить: `titleIcon`, `scarf`, `starScore`, `cpvIcon`, `badge`, `logo`, `icon`.
+   * При виборі фото картки:
+     * Спочатку перевіряти `jsonItemsById[itemId]?.img`.
+     * Якщо в JSON немає — перебирати всі `card.querySelectorAll('img')`, пропускати ті, де `isBadgeOrIconUrl(src, img)` дорівнює `true`, і брати першу справжню фотографію товару (пріоритет `img[class*="images--item"]`).
+   * Якщо після обходу DOM-карток у `jsonItemsById` є товари, яких ще немає у `seen` (наприклад, картки внизу сторінки, які ще не відрендерились у DOM), додати їх у список результатів напряму з `jsonItemsById`, щоб забирати всі 60 товарів зі сторінки зі 100% валідними фото!
+3. **Очищення старих бейджів у базі даних:**
+   * Додати у `init_db()` в `src/db/database.py` (або виконати під час верифікації) очистку некоректних URL зображень у таблиці `products`, де `image_url` містить `154x64.png`, `Sb008eb53e92f463eb0a2c17c539df530h.png`, `110x42.png`, `48x48.png`, `60x60.png` (встановити `image_url = ""`), щоб старі іконки «hoic» та «and» зникли з таблиці.
 
 ---
 
-### 2. PWA Конфігурація (`manifest.json`, `sw.js`, `icon.svg`)
-* `src/web/static/icon.svg`: стильна мінімалістична SVG-іконка (512x512 viewBox, градієнт indigo/orange, символ радара/кошика).
-* `src/web/static/manifest.json`:
-  * `name`: `"AliParser — AliExpress Scraper"`
-  * `short_name`: `"AliParser"`
-  * `start_url`: `"/"`
-  * `display`: `"standalone"`
-  * `background_color`: `"#0f172a"`
-  * `theme_color`: `"#4f46e5"`
-  * `icons`: посилання на `/icon.svg` (`sizes: "any"`, `type: "image/svg+xml"`, `purpose: "any maskable"`).
-* `src/web/static/sw.js`:
-  * Кешує базову оболонку (`/`, `/manifest.json`, `/icon.svg`).
-  * Для всіх запитів `/api/*` використовує `fetch(event.request)` (Network-only, без кешування динамічних даних API).
+### 2. Виправлення генерації та відкриття Excel `src/services/exporter.py`
+1. **Встановлення системного пакету `libreoffice-calc`:**
+   * Виконати встановлення табличного процесора `pkexec apt-get install -y libreoffice-calc` (або якщо неінтерактивно — перевірити встановлення), щоб LibreOffice мав модуль Calc для відкриття `.xlsx`.
+2. **Оновлення `src/services/exporter.py`:**
+   * Англомовні заголовки `EXCEL_HEADERS`:
+     ```python
+     EXCEL_HEADERS = [
+         "Item ID",
+         "Product Title",
+         "Price",
+         "Original Price",
+         "Currency",
+         "Rating",
+         "Orders",
+         "Store",
+         "Category / Query",
+         "Product URL",
+         "Image URL",
+         "Scraped At (UTC)",
+     ]
+     ```
+   * Додати функцію `_clean_xml_string(value: Optional[str]) -> str`, яка видаляє заборонені в XML керуючі символи (`re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\uFFFE\uFFFF]", "", str(value))`).
+   * Використовувати повні 8-символьні ARGB кольори:
+     * `header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFFFF")`
+     * `header_fill = PatternFill(start_color="FF1E293B", end_color="FF1E293B", fill_type="solid")`
+     * `data_font = Font(name="Calibri", size=10, color="FF0F172A")`
+     * `link_font = Font(name="Calibri", size=10, color="FF2563EB", underline="single")`
+   * Після `wb.save(buffer)` нормалізувати ZIP-архів `.xlsx` (замінити у `xl/_rels/workbook.xml.rels` абсолютні шляхи `Target="/xl/` на відносні `Target="`), щоб файл без жодних попереджень відкривався у всіх табличних процесорах.
 
 ---
 
-### 3. Англомовний Інтерфейс `src/web/static/index.html`
-Усі написи, кнопки, підказки, статуси та таблиці мають бути **виключно англійською мовою**. Дизайн — сучасний темний дашборд (`bg-slate-950 text-slate-100`, картки `bg-slate-900 border-slate-800`, акценти `indigo-600` / `emerald-500`).
+### 3. Світла Тема (Light Theme) та UI-виправлення `src/web/static/index.html`
 
-#### А. Верхня панель (Header)
-* Логотип (`icon.svg`) + назва **"AliParser"** та підзаголовок `"Universal AliExpress Catalog & Search Scraper"`.
-* Живий індикатор стану парсера у шапці (`Status Pill`: `IDLE`, `RUNNING`, `STOPPING`, `COMPLETED`, `STOPPED`, `ERROR` з пульсуючою точкою під час роботи).
-* Кнопка **"Proxies (N)"** — відкриває модальне вікно керування проксі (`<dialog>`).
-* Кнопка **"Export Excel (.xlsx)"** — завантажує файл `/api/products/export` (з урахуванням поточного пошукового фільтра та обраної задачі).
+#### А. Світла кольорова палітра
+* Прибрати `class="dark"` з тегу `<html>`.
+* Фон `<body>`: `bg-slate-50 text-slate-900 min-h-screen font-sans antialiased selection:bg-indigo-600 selection:text-white`.
+* Шапка `<header>`: `sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs`.
+* Картки (`Scraper Control Center`, `Live Telemetry & Progress`, `Scraped Products Catalog`): `bg-white border border-slate-200 rounded-2xl shadow-sm`.
+* Поля вводу та селекти: `bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/15 text-slate-900 placeholder-slate-400`.
+* Чіпси `Quick Presets`: `bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200`.
+* Картки телеметрії (`Elapsed Time`, `Estimated Remaining`, `Items Collected`, `Collection Speed`): `bg-slate-50 border border-slate-200/90 rounded-xl p-3`:
+  * `Elapsed Time`: `text-slate-900`
+  * `Estimated Remaining`: `text-amber-600`
+  * `Items Collected`: `text-emerald-600`
+  * `Collection Speed`: `text-indigo-600`
+* Таблиця товарів:
+  * Заголовок `<thead>`: `bg-slate-50 border-b border-slate-200 text-slate-500`.
+  * Рядки `<tbody>`: `divide-y divide-slate-200/70`, `hover:bg-slate-50/90`.
+  * Назва товару: `font-medium text-slate-900 hover:text-indigo-600`.
+  * Ціна: `font-bold text-emerald-600`, стара ціна: `text-slate-400 line-through`.
+  * Рейтинг: `text-amber-500 font-semibold`, бейдж замовлень: `bg-slate-100 text-slate-700 border border-slate-200`.
+* Модальне вікно `Proxy Manager`: `bg-white text-slate-900 border border-slate-200 shadow-2xl`.
+* У `src/web/static/manifest.json`: оновити `"background_color": "#f8fafc"`, `"theme_color": "#4f46e5"`.
 
-#### Б. Панель керування парсером (Scraper Control Card)
-* **Target Input (`target`):**
-  * Label: `"Search Query or Category URL"`
-  * Placeholder: `"e.g. wireless mechanical keyboard or https://www.aliexpress.com/category/..."`
-  * Швидкі чіпси (Quick Presets) під полем для зручного тестування в 1 клік: `wireless mouse`, `mechanical keyboard`, `usb c hub`, `smart watch`.
-* **Max Pages (`max_pages`):** числове поле (`1` – `50`, за замовчуванням `1`).
-* **Page Delay (`delay_seconds`):** числове поле (`0` – `30` sec, за замовчуванням `1.5`, крок `0.5`).
-* **Proxy Selector (`proxy_id`):** випадаючий список:
-  * За замовчуванням: `"Direct Connection (No Proxy)"` (`value=""`).
-  * Усі збережені проксі з `/api/proxies` із відображенням їхнього статусу та пінгу (`http://1.2.3.4:8080 [OK 120ms]`).
-* **Кнопки керування:**
-  * **"Start Scraping"**: відправляє `POST /api/parser/start`. Під час виконання парсингу кнопка стає неактивною (`disabled`) та показує обертовий спінер.
-  * **"Stop Parser"**: активна лише коли `is_running == true`, відправляє `POST /api/parser/stop` для безпечної зупинки.
+#### Б. Заміна системних стрілочок `Max Pages` та `Page Delay` на кастомні кнопки `−` / `+`
+* Додати в `<style>` повне вимкнення браузерних спінерів:
+  ```css
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  ```
+* Для `maxPagesInput` та `delayInput` зробити акуратний комбінований контрол (`flex items-center rounded-xl bg-slate-50 border border-slate-300 focus-within:border-indigo-600 focus-within:bg-white overflow-hidden`):
+  * Зліва кнопка `−` (`onclick="stepInput('maxPagesInput', -1)"`), посередині числовий `<input>` (`text-center bg-transparent border-0 focus:ring-0`), справа кнопка `+` (`onclick="stepInput('maxPagesInput', 1)"`).
+  * Аналогічно для `delayInput` із кроком `-0.5` та `+0.5`.
 
-#### В. Панель живих індикаторів та таймерів (Live Telemetry & Progress Panel)
-Відображає телеметрію активного або останнього запуску (опитування `GET /api/parser/status` кожні `1000ms` під час роботи):
-1. **Progress Bar:** плавний смугастий прогрес-бар (`0%` – `100%`) + текст `"Page X of Y (Z%)"`.
-2. **Elapsed Time (Таймер роботи):** форматований час `MM:SS` на основі `elapsed_seconds`.
-3. **Estimated Remaining (ETA — Скільки часу залишилось):** форматований час `MM:SS` на основі `estimated_remaining_seconds` (наприклад, `"~00:14 remaining"`, або `"—"`, коли парсер у стані `idle`/`completed`).
-4. **Items Collected & Speed:** лічильник зібраних у поточній задачі товарів (`items_scraped`) та швидкість (`items_per_second` items/sec).
-5. **Error Banner:** якщо API повертає помилку або в статусі є `error_message` — показувати помітний червоний банер із текстом помилки та кнопкою закриття `"Dismiss"`.
+#### В. Прибирання емодзі-стрілки у кнопці `View Item`
+* У шаблоні рядка таблиці замінити `<span>View Item ↗</span>` на чистий текст `<span>View Item</span>` (без символу `↗` і без емодзі). Стиль кнопки: `inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 hover:bg-indigo-600 text-indigo-700 hover:text-white border border-indigo-200 hover:border-indigo-600 transition-colors`.
 
-#### Г. Таблиця зібраних товарів (Scraped Products Catalog)
-* **Панель інструментів таблиці:**
-  * Поле пошуку `"Search products by title, store, or category..."` (із debounce 300ms).
-  * Випадаючий список фільтрації за задачею `"All Scraping Runs"` + список останніх задач із `GET /api/parser/tasks` (`#ID - target (N items)`).
-  * Лічильник: `"Total Products: N"`.
-  * Кнопка **"Refresh"** та кнопка **"Clear All"** (`DELETE /api/products` з підтвердженням).
-* **Стовпці таблиці:**
-  1. **Product** — мініатюра фото (`referrerpolicy="no-referrer"`, з акуратним fallback-іконкою при помилці завантаження), повна назва товару, ID товару (`ID: 100500...`) та тег категорії/запиту (`category_or_query`).
-  2. **Price** — актуальна ціна з валютою (`$19.99` або `UAH ...`), а поруч закреслена стара ціна (`original_price`), якщо вона є.
-  3. **Rating & Orders** — зірочка з рейтингом (`4.8`) та бейдж кількості замовлень (`500+ sold`).
-  4. **Store** — назва магазину (`store_name` або `"—"`).
-  5. **Scraped At** — дата та час збору.
-  6. **Action** — пряма кнопка-посилання **"View Item ↗"** (`href="${product_url}" target="_blank" rel="noopener noreferrer"`), що відкриває картку товару на AliExpress у новій вкладці.
-* Під час активного парсингу таблиця автоматично оновлюється при збільшенні `items_scraped`, щоб користувач одразу бачив нові товари на екрані.
-
-#### Д. Модальне вікно Проксі (Proxy Manager Modal)
-* Поле введення нового проксі (`host:port`, `host:port:user:pass`, `http://...`, `socks5://...`).
-* Чекбокс `"Test connectivity immediately"` (за замовчуванням увімкнений) + кнопка **"Add Proxy"**.
-* Список доданих проксі з відображенням:
-  * Адреса та протокол (`SOCKS5` / `HTTP`), наявність авторизації.
-  * Статус: зелений бейдж `"Online (115 ms)"`, червоний `"Offline"`, або сірий `"Untested"`.
-  * Кнопка **"Check"** (`POST /api/proxies/{id}/check`) зі спінером під час перевірки.
-  * Кнопка **"Delete"** (`DELETE /api/proxies/{id}`).
-
----
-
-### 4. Верифікаційний скрипт `scripts/test_pwa.py`
-Написати тестовий скрипт з `TestClient(app)`, який перевіряє:
-1. `GET /` повертає `200 OK`, `text/html`, і містить ключові англомовні елементи інтерфейсу (`AliParser`, `Start Scraping`, `Export Excel`, `Proxy Manager`, `manifest.json`).
-2. `GET /manifest.json` повертає `200 OK` та валідний JSON з `"name"` та `"icons"`.
-3. `GET /sw.js` повертає `200 OK` та код Service Worker.
-4. `GET /icon.svg` повертає `200 OK` та `<svg`.
-5. Виводить у консоль: `ALL PWA FRONTEND TESTS PASSED`.
+#### Г. Надійне завантаження Excel через `fetch` + `Blob`
+* Оновити JS-функцію `exportExcel()`:
+  ```javascript
+  async function exportExcel() {
+    const btn = document.getElementById("exportExcelBtn");
+    // Виконує fetch('/api/products/export?...'), перевіряє res.ok,
+    // отримує const blob = await res.blob(), створює тимчасовий URL.createObjectURL(blob)
+    // та викликає клік по <a download="aliexpress_products.xlsx">
+  }
+  ```
 
 ---
 
 ## Критерії приймання та верифікація (Verification)
-1. **Запуск тесту PWA:**
-   ```bash
-   venv/bin/python scripts/test_pwa.py
-   ```
-   *Очікуваний результат:* виводиться `ALL PWA FRONTEND TESTS PASSED`.
-2. **Повторна перевірка існуючих API тестів (щоб переконатися у відсутності регресій):**
+1. **Встановлення `libreoffice-calc` (якщо доступно) та перевірка конвертації Excel:**
    ```bash
    venv/bin/python scripts/test_api_and_export.py
+   ```
+2. **Перевірка оновленого скрапера фотографій на реальному запиті:**
+   ```bash
+   venv/bin/python scripts/test_scraper.py --query "usb c hub" --pages 1
+   ```
+   *Перевірити:* жоден із зібраних товарів не має `154x64.png` або `Sb008eb53e92f463eb0a2c17c539df530h.png` у полі `image_url` — усі товари мають справжні URL фотографій продуктів.
+3. **Перевірка тестів PWA:**
+   ```bash
+   venv/bin/python scripts/test_pwa.py
    ```
 
 ---
@@ -140,12 +169,12 @@
 ## Обов'язковий фінальний крок (Автоматичний Git Commit & Push)
 Після успішного проходження верифікації агент у Чаті 2 **ЗОБОВ'ЯЗАНИЙ самостійно виконати** в терміналі команду фіксації та відправки змін на GitHub:
 ```bash
-git add . && git commit -m "feat: implement English PWA frontend dashboard with live telemetry, proxy manager, and Excel export" && git push origin main
+git add . && git commit -m "fix: resolve product image badges, fix Excel export format, add custom number steppers, and switch to Light Theme UI" && git push origin main
 ```
 
 ---
 
 ## Формат звіту після виконання (у Чат 2)
-1. Список створених та модифікованих файлів.
-2. Лог виконання `scripts/test_pwa.py` та `scripts/test_api_and_export.py`.
+1. Список модифікованих файлів.
+2. Лог перевірки `test_scraper.py`, `test_api_and_export.py` та `test_pwa.py`.
 3. Підтвердження виконання `git commit` та `git push origin main` (із хешем коміту).
