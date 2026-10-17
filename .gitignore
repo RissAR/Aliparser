@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Data & SQLite
+*.db
+*.sqlite3
+data/
+downloads/
+exports/
+
+# Playwright / Browsers
+.playwright/
+test-results/
+
+# Node / Frontend
+node_modules/
+dist/
+.cache/
+
+# Environment & IDE
+.env
+.env.local
+.vscode/
+.idea/
+*.log
